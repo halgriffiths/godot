@@ -4811,23 +4811,18 @@ namespace {
 void TileData::update_inherited_polygons() {
 	ERR_FAIL_COND_MSG(is_primary, "Inherited polygon rotations are only allowed for alternative tiles (with its alternative_id != 0)");
 	// Update navigation poly
-	auto original_navigation = parent_tile->navigation;
-	for (int i = 0; i < original_navigation.size(); i++) {
-		Ref<NavigationPolygon> parent_nav_poly = original_navigation[i];
-		if (parent_nav_poly.is_valid()) {
-			Ref<NavigationPolygon> local_nav_poly = get_navigation_polygon(i);
-			if (!local_nav_poly.is_valid()) {
-				add_navigation_layer(i);
-				set_navigation_polygon(i, Ref<NavigationPolygon>(memnew(NavigationPolygon)));
-			}
-			local_nav_poly = get_navigation_polygon(i);
-			local_nav_poly->clear_outlines();
-			for (int j = 0; j < parent_nav_poly->get_outline_count(); j++) {
-				Vector<Vector2> rotated_polygon = rotate_polygon(parent_nav_poly->get_outline(j), flip_h, flip_v, transpose);
-				local_nav_poly->add_outline(rotated_polygon);
+	navigation.clear();
+	for (int i = 0; i < parent_tile->navigation.size(); i++) {
+		add_navigation_layer(i);
+		if (parent_tile->navigation[i].is_valid()) {
+			Ref<NavigationPolygon> new_nav_poly = Ref<NavigationPolygon>(memnew(NavigationPolygon));
+			for (int j = 0; j < parent_tile->navigation[i]->get_outline_count(); j++) {
+				Vector<Vector2> rotated_polygon = rotate_polygon(parent_tile->navigation[i]->get_outline(j), flip_h, flip_v, transpose);
+				new_nav_poly->add_outline(rotated_polygon);
 				
 			// Regenerate polygons & vertices
-			local_nav_poly->make_polygons_from_outlines();
+			new_nav_poly->make_polygons_from_outlines();
+			set_navigation_polygon(i, new_nav_poly);
 			}
 			
 		}
@@ -4838,7 +4833,7 @@ void TileData::update_inherited_polygons() {
 	for (int i = 0; i < parent_tile->physics.size(); i++) {
 		add_physics_layer(i);
 		for (int j = 0; j < parent_tile->physics[i].polygons.size(); j++) {
-			add_collision_polygon(j);
+			add_collision_polygon(i);
 			set_collision_polygon_points(i, j, rotate_polygon(parent_tile->get_collision_polygon_points(i, j), flip_h, flip_v, transpose));
 		}
 	}
@@ -5369,6 +5364,9 @@ void TileData::set_navigation_polygon(int p_layer_id, Ref<NavigationPolygon> p_n
 }
 
 Ref<NavigationPolygon> TileData::get_navigation_polygon(int p_layer_id) const {
+	if (p_layer_id >= navigation.size()) {
+		return Ref<NavigationPolygon>();
+	}
 	ERR_FAIL_INDEX_V(p_layer_id, navigation.size(), Ref<NavigationPolygon>());
 	return navigation[p_layer_id];
 }
