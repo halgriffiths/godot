@@ -4315,14 +4315,11 @@ int TileSetAtlasSource::create_alternative_tile(const Vector2i p_atlas_coords, i
 
 	int new_alternative_id = p_alternative_id_override >= 0 ? p_alternative_id_override : tiles[p_atlas_coords].next_alternative_id;
 
-	auto original_tile_data = tiles[p_atlas_coords].alternatives[0];
 	tiles[p_atlas_coords].alternatives[new_alternative_id] = memnew(TileData);
 	tiles[p_atlas_coords].alternatives[new_alternative_id]->set_is_primary(false);
-	tiles[p_atlas_coords].alternatives[new_alternative_id]->set_parent_data(original_tile_data);
+	tiles[p_atlas_coords].alternatives[new_alternative_id]->set_parent_data(tiles[p_atlas_coords].alternatives[0]);
 	tiles[p_atlas_coords].alternatives[new_alternative_id]->set_tile_set(tile_set);
-
 	tiles[p_atlas_coords].alternatives[new_alternative_id]->notify_property_list_changed();
-
 	tiles[p_atlas_coords].alternatives_ids.append(new_alternative_id);
 	tiles[p_atlas_coords].alternatives_ids.sort();
 	_compute_next_alternative_id(p_atlas_coords);
@@ -4817,8 +4814,7 @@ void TileData::update_inherited_polygons() {
 		if (parent_tile->navigation[i].is_valid()) {
 			Ref<NavigationPolygon> new_nav_poly = Ref<NavigationPolygon>(memnew(NavigationPolygon));
 			for (int j = 0; j < parent_tile->navigation[i]->get_outline_count(); j++) {
-				Vector<Vector2> rotated_polygon = rotate_polygon(parent_tile->navigation[i]->get_outline(j), flip_h, flip_v, transpose);
-				new_nav_poly->add_outline(rotated_polygon);
+				new_nav_poly->add_outline(rotate_polygon(parent_tile->navigation[i]->get_outline(j), flip_h, flip_v, transpose););
 				
 			// Regenerate polygons & vertices
 			new_nav_poly->make_polygons_from_outlines();
@@ -4861,6 +4857,7 @@ void TileData::notify_tile_data_properties_should_change() {
 		}
 	}
 	navigation.resize(tile_set->get_navigation_layers_count());
+
 	// Convert custom data to the new type.
 	custom_data.resize(tile_set->get_custom_data_layers_count());
 	for (int i = 0; i < custom_data.size(); i++) {
