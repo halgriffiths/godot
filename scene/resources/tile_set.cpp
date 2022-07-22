@@ -4814,7 +4814,7 @@ void TileData::update_inherited_polygons() {
 		if (parent_tile->navigation[i].is_valid()) {
 			Ref<NavigationPolygon> new_nav_poly = Ref<NavigationPolygon>(memnew(NavigationPolygon));
 			for (int j = 0; j < parent_tile->navigation[i]->get_outline_count(); j++) {
-				new_nav_poly->add_outline(rotate_polygon(parent_tile->navigation[i]->get_outline(j), flip_h, flip_v, transpose););
+				new_nav_poly->add_outline(rotate_polygon(parent_tile->navigation[i]->get_outline(j), flip_h, flip_v, transpose));
 				
 			// Regenerate polygons & vertices
 			new_nav_poly->make_polygons_from_outlines();
