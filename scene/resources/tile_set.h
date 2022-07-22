@@ -776,7 +776,7 @@ class TileData : public Object {
 
 private:
 	const TileSet *tile_set = nullptr;
-	bool allow_transform = true;
+	bool is_primary = false;
 
 	// Rendering
 	bool flip_h = false;
@@ -848,8 +848,8 @@ public:
 	void move_custom_data_layer(int p_from_index, int p_to_pos);
 	void remove_custom_data_layer(int p_index);
 	void reset_state();
-	void set_allow_transform(bool p_allow_transform);
-	bool is_allowing_transform() const;
+	void set_is_primary(bool p_is_primary);
+	bool get_is_primary() const;
 
 	// To duplicate a TileData object, needed for runtiume update.
 	TileData *duplicate();

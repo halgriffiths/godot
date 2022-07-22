@@ -3807,7 +3807,7 @@ bool TileSetAtlasSource::_set(const StringName &p_name, const Variant &p_value) 
 					if (!tiles[coords].alternatives.has(alternative_id)) {
 						tiles[coords].alternatives[alternative_id] = memnew(TileData);
 						tiles[coords].alternatives[alternative_id]->set_tile_set(tile_set);
-						tiles[coords].alternatives[alternative_id]->set_allow_transform(alternative_id > 0);
+						tiles[coords].alternatives[alternative_id]->set_is_primary(alternative_id == 0);
 						tiles[coords].alternatives_ids.append(alternative_id);
 					}
 					if (components.size() >= 3) {
@@ -3978,8 +3978,8 @@ void TileSetAtlasSource::create_tile(const Vector2i p_atlas_coords, const Vector
 	tad.size_in_atlas = p_size;
 	tad.animation_frames_durations.push_back(1.0);
 	tad.alternatives[0] = memnew(TileData);
+	tad.alternatives[0]->set_is_primary(true);
 	tad.alternatives[0]->set_tile_set(tile_set);
-	tad.alternatives[0]->set_allow_transform(false);
 	tad.alternatives[0]->connect("changed", callable_mp((Resource *)this, &TileSetAtlasSource::emit_changed));
 	tad.alternatives[0]->notify_property_list_changed();
 	tad.alternatives_ids.append(0);
@@ -4315,6 +4315,7 @@ int TileSetAtlasSource::create_alternative_tile(const Vector2i p_atlas_coords, i
 	int new_alternative_id = p_alternative_id_override >= 0 ? p_alternative_id_override : tiles[p_atlas_coords].next_alternative_id;
 
 	tiles[p_atlas_coords].alternatives[new_alternative_id] = memnew(TileData);
+	tiles[p_atlas_coords].alternatives[new_alternative_id]->set_is_primary(false);
 	tiles[p_atlas_coords].alternatives[new_alternative_id]->set_tile_set(tile_set);
 	tiles[p_atlas_coords].alternatives[new_alternative_id]->set_allow_transform(true);
 	tiles[p_atlas_coords].alternatives[new_alternative_id]->notify_property_list_changed();
@@ -4982,19 +4983,19 @@ void TileData::reset_state() {
 	custom_data.clear();
 }
 
-void TileData::set_allow_transform(bool p_allow_transform) {
-	allow_transform = p_allow_transform;
+void TileData::set_is_primary(bool p_is_primary) {
+	is_primary = p_is_primary;
 }
 
-bool TileData::is_allowing_transform() const {
-	return allow_transform;
+bool TileData::get_is_primary() const {
+	return is_primary;
 }
 
 TileData *TileData::duplicate() {
 	TileData *output = memnew(TileData);
 	output->tile_set = tile_set;
 
-	output->allow_transform = allow_transform;
+	output->is_primary = is_primary;
 
 	// Rendering
 	output->flip_h = flip_h;
@@ -5023,7 +5024,7 @@ TileData *TileData::duplicate() {
 
 // Rendering
 void TileData::set_flip_h(bool p_flip_h) {
-	ERR_FAIL_COND_MSG(!allow_transform && p_flip_h, "Transform is only allowed for alternative tiles (with its alternative_id != 0)");
+	ERR_FAIL_COND_MSG(is_primary && p_flip_h, "Transform is only allowed for alternative tiles (with its alternative_id != 0)");
 	flip_h = p_flip_h;
 	emit_signal(SNAME("changed"));
 }
@@ -5032,7 +5033,7 @@ bool TileData::get_flip_h() const {
 }
 
 void TileData::set_flip_v(bool p_flip_v) {
-	ERR_FAIL_COND_MSG(!allow_transform && p_flip_v, "Transform is only allowed for alternative tiles (with its alternative_id != 0)");
+	ERR_FAIL_COND_MSG(is_primary && p_flip_v, "Transform is only allowed for alternative tiles (with its alternative_id != 0)");
 	flip_v = p_flip_v;
 	emit_signal(SNAME("changed"));
 }
@@ -5042,7 +5043,7 @@ bool TileData::get_flip_v() const {
 }
 
 void TileData::set_transpose(bool p_transpose) {
-	ERR_FAIL_COND_MSG(!allow_transform && p_transpose, "Transform is only allowed for alternative tiles (with its alternative_id != 0)");
+	ERR_FAIL_COND_MSG(is_primary && p_transpose, "Transform is only allowed for alternative tiles (with its alternative_id != 0)");
 	transpose = p_transpose;
 	emit_signal(SNAME("changed"));
 }
