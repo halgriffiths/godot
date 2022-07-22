@@ -4833,20 +4833,15 @@ void TileData::update_inherited_polygons() {
 		}
 	}
 
-	//// Update physics polygons
-	//for (int i = 0; i < original_physics.size(); i++) {
-	//	Ref<PhysicsLayerTileData> parent_physics_layer = original_physics[i];
-	//	if (parent_physics_layer.is_valid()) {
-	//		Ref<PhysicsLayerTileData> local_physics_layer = get_navigation_polygon(i);
-	//		if (local_physics_layer.is_valid()) {
-	//			for (int j = 0; j < parent_physics_layer->get_collision_polygons_count(i); j++) {
-	//				Vector<Vector2> rotated_polygon = rotate_polygon(parent_physics_layer->get_collision_polygon_points(i, j), flip_h, flip_v, transpose);
-	//				local_physics_layer->set_collision_polygon_points(i, j);
-	//			}
-	//		}
-
-	//	}
-	//}
+	// Update physics polygons
+	physics.clear();
+	for (int i = 0; i < parent_tile->physics.size(); i++) {
+		add_physics_layer(i);
+		for (int j = 0; j < parent_tile->physics[i].polygons.size(); j++) {
+			add_collision_polygon(j);
+			set_collision_polygon_points(i, j, rotate_polygon(parent_tile->get_collision_polygon_points(i, j), flip_h, flip_v, transpose));
+		}
+	}
 }
 
 void TileData::set_tile_set(const TileSet *p_tile_set) {
@@ -4885,9 +4880,6 @@ void TileData::notify_tile_data_properties_should_change() {
 			}
 			custom_data.write[i] = new_val;
 		}
-	}
-	if (!get_is_primary()) {
-		update_inherited_polygons();
 	}
 
 	notify_property_list_changed();
