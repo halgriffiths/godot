@@ -3980,6 +3980,7 @@ void TileSetAtlasSource::create_tile(const Vector2i p_atlas_coords, const Vector
 	tad.alternatives[0] = memnew(TileData);
 	tad.alternatives[0]->set_is_primary(true);
 	tad.alternatives[0]->set_tile_set(tile_set);
+	tad.alternatives[0]->set_parent_data(tad.alternatives[0]);
 	tad.alternatives[0]->connect("changed", callable_mp((Resource *)this, &TileSetAtlasSource::emit_changed));
 	tad.alternatives[0]->notify_property_list_changed();
 	tad.alternatives_ids.append(0);
@@ -4314,11 +4315,14 @@ int TileSetAtlasSource::create_alternative_tile(const Vector2i p_atlas_coords, i
 
 	int new_alternative_id = p_alternative_id_override >= 0 ? p_alternative_id_override : tiles[p_atlas_coords].next_alternative_id;
 
+	auto original_tile_data = tiles[p_atlas_coords].alternatives[0];
 	tiles[p_atlas_coords].alternatives[new_alternative_id] = memnew(TileData);
 	tiles[p_atlas_coords].alternatives[new_alternative_id]->set_is_primary(false);
+	tiles[p_atlas_coords].alternatives[new_alternative_id]->set_parent_data(original_tile_data);
 	tiles[p_atlas_coords].alternatives[new_alternative_id]->set_tile_set(tile_set);
-	tiles[p_atlas_coords].alternatives[new_alternative_id]->set_allow_transform(true);
+
 	tiles[p_atlas_coords].alternatives[new_alternative_id]->notify_property_list_changed();
+
 	tiles[p_atlas_coords].alternatives_ids.append(new_alternative_id);
 	tiles[p_atlas_coords].alternatives_ids.sort();
 	_compute_next_alternative_id(p_atlas_coords);
@@ -4784,9 +4788,74 @@ void TileSetScenesCollectionSource::_bind_methods() {
 
 /////////////////////////////// TileData //////////////////////////////////////
 
+namespace {
+	Vector<Point2> rotate_polygon(Vector<Point2>& original_polygon, bool flip_h, bool flip_v, bool transpose) {
+		Vector<Point2> new_polygon;
+		for (int point_index = 0; point_index < original_polygon.size(); point_index++) {
+			Vector2 point = original_polygon[point_index];
+			if (flip_h) {
+				point = Vector2(-point.x, point.y);
+			}
+			if (flip_v) {
+				point = Vector2(point.x, -point.y);
+			}
+			if (transpose) {
+				point = Vector2(point.y, point.x);
+			}
+			new_polygon.push_back(point);
+		}
+		return new_polygon;
+	}
+}
+
+void TileData::update_inherited_polygons() {
+	ERR_FAIL_COND_MSG(is_primary, "Inherited polygon rotations are only allowed for alternative tiles (with its alternative_id != 0)");
+	// Update navigation poly
+	auto original_navigation = parent_tile->navigation;
+	for (int i = 0; i < original_navigation.size(); i++) {
+		Ref<NavigationPolygon> parent_nav_poly = original_navigation[i];
+		if (parent_nav_poly.is_valid()) {
+			Ref<NavigationPolygon> local_nav_poly = get_navigation_polygon(i);
+			if (!local_nav_poly.is_valid()) {
+				add_navigation_layer(i);
+				set_navigation_polygon(i, Ref<NavigationPolygon>(memnew(NavigationPolygon)));
+			}
+			local_nav_poly = get_navigation_polygon(i);
+			local_nav_poly->clear_outlines();
+			for (int j = 0; j < parent_nav_poly->get_outline_count(); j++) {
+				Vector<Vector2> rotated_polygon = rotate_polygon(parent_nav_poly->get_outline(j), flip_h, flip_v, transpose);
+				local_nav_poly->add_outline(rotated_polygon);
+				
+			// Regenerate polygons & vertices
+			local_nav_poly->make_polygons_from_outlines();
+			}
+			
+		}
+	}
+
+	//// Update physics polygons
+	//for (int i = 0; i < original_physics.size(); i++) {
+	//	Ref<PhysicsLayerTileData> parent_physics_layer = original_physics[i];
+	//	if (parent_physics_layer.is_valid()) {
+	//		Ref<PhysicsLayerTileData> local_physics_layer = get_navigation_polygon(i);
+	//		if (local_physics_layer.is_valid()) {
+	//			for (int j = 0; j < parent_physics_layer->get_collision_polygons_count(i); j++) {
+	//				Vector<Vector2> rotated_polygon = rotate_polygon(parent_physics_layer->get_collision_polygon_points(i, j), flip_h, flip_v, transpose);
+	//				local_physics_layer->set_collision_polygon_points(i, j);
+	//			}
+	//		}
+
+	//	}
+	//}
+}
+
 void TileData::set_tile_set(const TileSet *p_tile_set) {
 	tile_set = p_tile_set;
 	notify_tile_data_properties_should_change();
+}
+
+void TileData::set_parent_data(const TileData* p_parent) {
+	parent_tile = p_parent;
 }
 
 void TileData::notify_tile_data_properties_should_change() {
@@ -4802,7 +4871,6 @@ void TileData::notify_tile_data_properties_should_change() {
 		}
 	}
 	navigation.resize(tile_set->get_navigation_layers_count());
-
 	// Convert custom data to the new type.
 	custom_data.resize(tile_set->get_custom_data_layers_count());
 	for (int i = 0; i < custom_data.size(); i++) {
@@ -4817,6 +4885,9 @@ void TileData::notify_tile_data_properties_should_change() {
 			}
 			custom_data.write[i] = new_val;
 		}
+	}
+	if (!get_is_primary()) {
+		update_inherited_polygons();
 	}
 
 	notify_property_list_changed();
@@ -5026,6 +5097,7 @@ TileData *TileData::duplicate() {
 void TileData::set_flip_h(bool p_flip_h) {
 	ERR_FAIL_COND_MSG(is_primary && p_flip_h, "Transform is only allowed for alternative tiles (with its alternative_id != 0)");
 	flip_h = p_flip_h;
+	update_inherited_polygons();
 	emit_signal(SNAME("changed"));
 }
 bool TileData::get_flip_h() const {
@@ -5035,6 +5107,7 @@ bool TileData::get_flip_h() const {
 void TileData::set_flip_v(bool p_flip_v) {
 	ERR_FAIL_COND_MSG(is_primary && p_flip_v, "Transform is only allowed for alternative tiles (with its alternative_id != 0)");
 	flip_v = p_flip_v;
+	update_inherited_polygons();
 	emit_signal(SNAME("changed"));
 }
 
@@ -5045,6 +5118,7 @@ bool TileData::get_flip_v() const {
 void TileData::set_transpose(bool p_transpose) {
 	ERR_FAIL_COND_MSG(is_primary && p_transpose, "Transform is only allowed for alternative tiles (with its alternative_id != 0)");
 	transpose = p_transpose;
+	update_inherited_polygons();
 	emit_signal(SNAME("changed"));
 }
 bool TileData::get_transpose() const {

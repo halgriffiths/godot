@@ -819,6 +819,9 @@ private:
 	// Custom data
 	Vector<Variant> custom_data;
 
+	// Parent data (alternatives only)
+	const TileData* parent_tile;
+
 protected:
 	bool _set(const StringName &p_name, const Variant &p_value);
 	bool _get(const StringName &p_name, Variant &r_ret) const;
@@ -828,6 +831,10 @@ protected:
 public:
 	// Not exposed.
 	void set_tile_set(const TileSet *p_tile_set);
+
+	void set_parent_data(const TileData* p_parent);
+	void update_inherited_polygons();
+
 	void notify_tile_data_properties_should_change();
 	void add_occlusion_layer(int p_index);
 	void move_occlusion_layer(int p_from_index, int p_to_pos);
@@ -844,6 +851,7 @@ public:
 	void add_navigation_layer(int p_index);
 	void move_navigation_layer(int p_from_index, int p_to_pos);
 	void remove_navigation_layer(int p_index);
+	void clear_navigation_layers();
 	void add_custom_data_layer(int p_index);
 	void move_custom_data_layer(int p_from_index, int p_to_pos);
 	void remove_custom_data_layer(int p_index);
