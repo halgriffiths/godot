@@ -4790,14 +4790,14 @@ namespace {
 		Vector<Point2> new_polygon;
 		for (int point_index = 0; point_index < original_polygon.size(); point_index++) {
 			Vector2 point = original_polygon[point_index];
+			if (transpose) {
+				point = Vector2(point.y, point.x);
+			}
 			if (flip_h) {
 				point = Vector2(-point.x, point.y);
 			}
 			if (flip_v) {
 				point = Vector2(point.x, -point.y);
-			}
-			if (transpose) {
-				point = Vector2(point.y, point.x);
 			}
 			new_polygon.push_back(point);
 		}
