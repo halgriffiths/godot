@@ -2577,15 +2577,15 @@ void TileMap::set_cells_terrain_path(int p_layer, TypedArray<Vector2i> p_path, i
 	ERR_FAIL_INDEX(p_terrain_set, tile_set->get_terrain_sets_count());
 
 	Vector<Vector2i> vector_path;
-	for (int i = 0; i < p_path.size(); i++) {
-		vector_path.push_back(p_path[i]);
-	}
-	HashMap<Vector2i, TileSet::TerrainsPattern> terrain_fill_output = terrain_fill_path(p_layer, vector_path, p_terrain_set, p_terrain, p_ignore_empty_terrains);
 	// Make the painted path a set for faster lookups
 	HashSet<Vector2i> painted_set;
-	for (Vector2i coords : p_to_paint) {
-		painted_set.insert(coords);
+	for (int i = 0; i < p_path.size(); i++) {
+		vector_path.push_back(p_path[i]);
+		painted_set.insert(p_path[i]);
 	}
+	HashMap<Vector2i, TileSet::TerrainsPattern> terrain_fill_output = terrain_fill_path(p_layer, vector_path, p_terrain_set, p_terrain, p_ignore_empty_terrains);
+	
+	
 	for (const KeyValue<Vector2i, TileSet::TerrainsPattern> &E : terrain_fill_output) {
 		if (painted_set.has(E.key)) {
 			// Paint a random tile with the correct terrain for the painted path.
@@ -2594,7 +2594,7 @@ void TileMap::set_cells_terrain_path(int p_layer, TypedArray<Vector2i> p_path, i
 		} else {
 			// Avoids updating the painted path from the output if the new pattern is the same as before.
 			bool keep_old = false;
-			TileMapCell cell = tile_map->get_cell(tile_map_layer, E.key);
+			TileMapCell cell = get_cell(p_layer, E.key);
 			if (cell.source_id != TileSet::INVALID_SOURCE) {
 				TileSetSource *source = *tile_set->get_source(cell.source_id);
 				TileSetAtlasSource *atlas_source = Object::cast_to<TileSetAtlasSource>(source);
