@@ -2581,9 +2581,36 @@ void TileMap::set_cells_terrain_path(int p_layer, TypedArray<Vector2i> p_path, i
 		vector_path.push_back(p_path[i]);
 	}
 	HashMap<Vector2i, TileSet::TerrainsPattern> terrain_fill_output = terrain_fill_path(p_layer, vector_path, p_terrain_set, p_terrain, p_ignore_empty_terrains);
+	// Make the painted path a set for faster lookups
+	HashSet<Vector2i> painted_set;
+	for (Vector2i coords : p_to_paint) {
+		painted_set.insert(coords);
+	}
 	for (const KeyValue<Vector2i, TileSet::TerrainsPattern> &E : terrain_fill_output) {
-		TileMapCell c = tile_set->get_random_tile_from_terrains_pattern(p_terrain_set, E.value);
-		set_cell(p_layer, E.key, c.source_id, c.get_atlas_coords(), c.alternative_tile);
+		if (painted_set.has(E.key)) {
+			// Paint a random tile with the correct terrain for the painted path.
+			TileMapCell new_cell = tile_set->get_random_tile_from_terrains_pattern(p_terrain_set, E.value);
+			set_cell(p_layer, E.key, new_cell.source_id, new_cell.get_atlas_coords(), new_cell.alternative_tile);
+		} else {
+			// Avoids updating the painted path from the output if the new pattern is the same as before.
+			bool keep_old = false;
+			TileMapCell cell = tile_map->get_cell(tile_map_layer, E.key);
+			if (cell.source_id != TileSet::INVALID_SOURCE) {
+				TileSetSource *source = *tile_set->get_source(cell.source_id);
+				TileSetAtlasSource *atlas_source = Object::cast_to<TileSetAtlasSource>(source);
+				if (atlas_source) {
+					// Get tile data.
+					TileData *tile_data = atlas_source->get_tile_data(cell.get_atlas_coords(), cell.alternative_tile);
+					if (tile_data && tile_data->get_terrains_pattern() == E.value) {
+						keep_old = true;
+					}
+				}
+			}
+			if (!keep_old) {
+				TileMapCell new_cell = tile_set->get_random_tile_from_terrains_pattern(p_terrain_set, E.value);
+				set_cell(p_layer, E.key, new_cell.source_id, new_cell.get_atlas_coords(), new_cell.alternative_tile);
+			}
+		}
 	}
 }
 
