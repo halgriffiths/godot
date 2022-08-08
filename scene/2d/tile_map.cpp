@@ -2478,19 +2478,19 @@ HashMap<Vector2i, TileSet::TerrainsPattern> TileMap::terrain_fill_path(int p_lay
 		can_modify_list.push_back(coords);
 		can_modify_set.insert(coords);
 	}
-	for (Vector2i coords : p_path) {
-		// Find the adequate neighbor
-		for (int j = 0; j < TileSet::CELL_NEIGHBOR_MAX; j++) {
-			TileSet::CellNeighbor bit = TileSet::CellNeighbor(j);
-			if (tile_set->is_valid_terrain_peering_bit(p_terrain_set, bit)) {
-				Vector2i neighbor = get_neighbor_cell(coords, bit);
-				if (!can_modify_set.has(neighbor)) {
-					can_modify_list.push_back(neighbor);
-					can_modify_set.insert(neighbor);
-				}
-			}
-		}
-	}
+	// for (Vector2i coords : p_path) {
+		// // Find the adequate neighbor
+		// for (int j = 0; j < TileSet::CELL_NEIGHBOR_MAX; j++) {
+			// TileSet::CellNeighbor bit = TileSet::CellNeighbor(j);
+			// if (tile_set->is_valid_terrain_peering_bit(p_terrain_set, bit)) {
+				// Vector2i neighbor = get_neighbor_cell(coords, bit);
+				// if (!can_modify_set.has(neighbor)) {
+					// can_modify_list.push_back(neighbor);
+					// can_modify_set.insert(neighbor);
+				// }
+			// }
+		// }
+	// }
 
 	RBSet<TerrainConstraint> constraints;
 
