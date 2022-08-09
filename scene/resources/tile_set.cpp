@@ -3854,7 +3854,7 @@ bool TileSetAtlasSource::_set(const StringName &p_name, const Variant &p_value) 
 					if (!tiles[coords].alternatives.has(alternative_id)) {
 						tiles[coords].alternatives[alternative_id] = memnew(TileData);
 						tiles[coords].alternatives[alternative_id]->set_tile_set(tile_set);
-						tiles[coords].alternatives[alternative_id]->set_allow_transform(alternative_id > 0);
+						tiles[coords].alternatives[alternative_id]->set_is_primary(alternative_id == 0);
 						tiles[coords].alternatives_ids.append(alternative_id);
 					}
 					if (components.size() >= 3) {
@@ -4025,8 +4025,9 @@ void TileSetAtlasSource::create_tile(const Vector2i p_atlas_coords, const Vector
 	tad.size_in_atlas = p_size;
 	tad.animation_frames_durations.push_back(1.0);
 	tad.alternatives[0] = memnew(TileData);
+	tad.alternatives[0]->set_is_primary(true);
 	tad.alternatives[0]->set_tile_set(tile_set);
-	tad.alternatives[0]->set_allow_transform(false);
+	tad.alternatives[0]->set_parent_data(tad.alternatives[0]);
 	tad.alternatives[0]->connect("changed", callable_mp((Resource *)this, &TileSetAtlasSource::emit_changed));
 	tad.alternatives[0]->notify_property_list_changed();
 	tad.alternatives_ids.append(0);
@@ -4362,8 +4363,9 @@ int TileSetAtlasSource::create_alternative_tile(const Vector2i p_atlas_coords, i
 	int new_alternative_id = p_alternative_id_override >= 0 ? p_alternative_id_override : tiles[p_atlas_coords].next_alternative_id;
 
 	tiles[p_atlas_coords].alternatives[new_alternative_id] = memnew(TileData);
+	tiles[p_atlas_coords].alternatives[new_alternative_id]->set_is_primary(false);
+	tiles[p_atlas_coords].alternatives[new_alternative_id]->set_parent_data(tiles[p_atlas_coords].alternatives[0]);
 	tiles[p_atlas_coords].alternatives[new_alternative_id]->set_tile_set(tile_set);
-	tiles[p_atlas_coords].alternatives[new_alternative_id]->set_allow_transform(true);
 	tiles[p_atlas_coords].alternatives[new_alternative_id]->notify_property_list_changed();
 	tiles[p_atlas_coords].alternatives_ids.append(new_alternative_id);
 	tiles[p_atlas_coords].alternatives_ids.sort();
@@ -4830,9 +4832,63 @@ void TileSetScenesCollectionSource::_bind_methods() {
 
 /////////////////////////////// TileData //////////////////////////////////////
 
+namespace {
+	Vector<Point2> rotate_polygon(Vector<Point2>& original_polygon, bool flip_h, bool flip_v, bool transpose) {
+		Vector<Point2> new_polygon;
+		for (int point_index = 0; point_index < original_polygon.size(); point_index++) {
+			Vector2 point = original_polygon[point_index];
+			if (transpose) {
+				point = Vector2(point.y, point.x);
+			}
+			if (flip_h) {
+				point = Vector2(-point.x, point.y);
+			}
+			if (flip_v) {
+				point = Vector2(point.x, -point.y);
+			}
+			new_polygon.push_back(point);
+		}
+		return new_polygon;
+	}
+}
+
+void TileData::update_inherited_polygons() {
+	ERR_FAIL_COND_MSG(is_primary, "Inherited polygon rotations are only allowed for alternative tiles (with its alternative_id != 0)");
+	// Update navigation poly
+	navigation.clear();
+	for (int i = 0; i < parent_tile->navigation.size(); i++) {
+		add_navigation_layer(i);
+		if (parent_tile->navigation[i].is_valid()) {
+			Ref<NavigationPolygon> new_nav_poly = Ref<NavigationPolygon>(memnew(NavigationPolygon));
+			for (int j = 0; j < parent_tile->navigation[i]->get_outline_count(); j++) {
+				new_nav_poly->add_outline(rotate_polygon(parent_tile->navigation[i]->get_outline(j), flip_h, flip_v, transpose));
+				
+			// Regenerate polygons & vertices
+			new_nav_poly->make_polygons_from_outlines();
+			set_navigation_polygon(i, new_nav_poly);
+			}
+			
+		}
+	}
+
+	// Update physics polygons
+	physics.clear();
+	for (int i = 0; i < parent_tile->physics.size(); i++) {
+		add_physics_layer(i);
+		for (int j = 0; j < parent_tile->physics[i].polygons.size(); j++) {
+			add_collision_polygon(i);
+			set_collision_polygon_points(i, j, rotate_polygon(parent_tile->get_collision_polygon_points(i, j), flip_h, flip_v, transpose));
+		}
+	}
+}
+
 void TileData::set_tile_set(const TileSet *p_tile_set) {
 	tile_set = p_tile_set;
 	notify_tile_data_properties_should_change();
+}
+
+void TileData::set_parent_data(const TileData* p_parent) {
+	parent_tile = p_parent;
 }
 
 void TileData::notify_tile_data_properties_should_change() {
@@ -5022,19 +5078,26 @@ void TileData::remove_custom_data_layer(int p_index) {
 	custom_data.remove_at(p_index);
 }
 
-void TileData::set_allow_transform(bool p_allow_transform) {
-	allow_transform = p_allow_transform;
+void TileData::reset_state() {
+	occluders.clear();
+	physics.clear();
+	navigation.clear();
+	custom_data.clear();
 }
 
-bool TileData::is_allowing_transform() const {
-	return allow_transform;
+void TileData::set_is_primary(bool p_is_primary) {
+	is_primary = p_is_primary;
+}
+
+bool TileData::get_is_primary() const {
+	return is_primary;
 }
 
 TileData *TileData::duplicate() {
 	TileData *output = memnew(TileData);
 	output->tile_set = tile_set;
 
-	output->allow_transform = allow_transform;
+	output->is_primary = is_primary;
 
 	// Rendering
 	output->flip_h = flip_h;
@@ -5063,8 +5126,9 @@ TileData *TileData::duplicate() {
 
 // Rendering
 void TileData::set_flip_h(bool p_flip_h) {
-	ERR_FAIL_COND_MSG(!allow_transform && p_flip_h, "Transform is only allowed for alternative tiles (with its alternative_id != 0)");
+	ERR_FAIL_COND_MSG(is_primary && p_flip_h, "Transform is only allowed for alternative tiles (with its alternative_id != 0)");
 	flip_h = p_flip_h;
+	update_inherited_polygons();
 	emit_signal(SNAME("changed"));
 }
 bool TileData::get_flip_h() const {
@@ -5072,8 +5136,9 @@ bool TileData::get_flip_h() const {
 }
 
 void TileData::set_flip_v(bool p_flip_v) {
-	ERR_FAIL_COND_MSG(!allow_transform && p_flip_v, "Transform is only allowed for alternative tiles (with its alternative_id != 0)");
+	ERR_FAIL_COND_MSG(is_primary && p_flip_v, "Transform is only allowed for alternative tiles (with its alternative_id != 0)");
 	flip_v = p_flip_v;
+	update_inherited_polygons();
 	emit_signal(SNAME("changed"));
 }
 
@@ -5082,8 +5147,9 @@ bool TileData::get_flip_v() const {
 }
 
 void TileData::set_transpose(bool p_transpose) {
-	ERR_FAIL_COND_MSG(!allow_transform && p_transpose, "Transform is only allowed for alternative tiles (with its alternative_id != 0)");
+	ERR_FAIL_COND_MSG(is_primary && p_transpose, "Transform is only allowed for alternative tiles (with its alternative_id != 0)");
 	transpose = p_transpose;
+	update_inherited_polygons();
 	emit_signal(SNAME("changed"));
 }
 bool TileData::get_transpose() const {
@@ -5342,6 +5408,9 @@ void TileData::set_navigation_polygon(int p_layer_id, Ref<NavigationPolygon> p_n
 }
 
 Ref<NavigationPolygon> TileData::get_navigation_polygon(int p_layer_id) const {
+	if (p_layer_id >= navigation.size()) {
+		return Ref<NavigationPolygon>();
+	}
 	ERR_FAIL_INDEX_V(p_layer_id, navigation.size(), Ref<NavigationPolygon>());
 	return navigation[p_layer_id];
 }

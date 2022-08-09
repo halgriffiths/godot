@@ -442,7 +442,7 @@ void TileSetAtlasSourceEditor::AtlasTileProxyObject::_get_property_list(List<Pro
 		HashMap<String, int> counts; // Counts the number of time a property appears (useful for groups that may appear more than once)
 		for (List<PropertyInfo>::Element *E_property = list.front(); E_property; E_property = E_property->next()) {
 			const String &property_string = E_property->get().name;
-			if (!tile_data->is_allowing_transform() && (property_string == "flip_h" || property_string == "flip_v" || property_string == "transpose")) {
+			if (tile_data->get_is_primary() && (property_string == "flip_h" || property_string == "flip_v" || property_string == "transpose")) {
 				continue;
 			}
 
