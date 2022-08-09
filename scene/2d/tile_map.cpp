@@ -2478,19 +2478,19 @@ HashMap<Vector2i, TileSet::TerrainsPattern> TileMap::terrain_fill_path(int p_lay
 		can_modify_list.push_back(coords);
 		can_modify_set.insert(coords);
 	}
-	for (Vector2i coords : p_path) {
-		// Find the adequate neighbor
-		for (int j = 0; j < TileSet::CELL_NEIGHBOR_MAX; j++) {
-			TileSet::CellNeighbor bit = TileSet::CellNeighbor(j);
-			if (tile_set->is_valid_terrain_peering_bit(p_terrain_set, bit)) {
-				Vector2i neighbor = get_neighbor_cell(coords, bit);
-				if (!can_modify_set.has(neighbor)) {
-					can_modify_list.push_back(neighbor);
-					can_modify_set.insert(neighbor);
-				}
-			}
-		}
-	}
+	// for (Vector2i coords : p_path) {
+		// // Find the adequate neighbor
+		// for (int j = 0; j < TileSet::CELL_NEIGHBOR_MAX; j++) {
+			// TileSet::CellNeighbor bit = TileSet::CellNeighbor(j);
+			// if (tile_set->is_valid_terrain_peering_bit(p_terrain_set, bit)) {
+				// Vector2i neighbor = get_neighbor_cell(coords, bit);
+				// if (!can_modify_set.has(neighbor)) {
+					// can_modify_list.push_back(neighbor);
+					// can_modify_set.insert(neighbor);
+				// }
+			// }
+		// }
+	// }
 
 	RBSet<TerrainConstraint> constraints;
 
@@ -2590,13 +2590,40 @@ void TileMap::set_cells_terrain_path(int p_layer, TypedArray<Vector2i> p_path, i
 	ERR_FAIL_INDEX(p_terrain_set, tile_set->get_terrain_sets_count());
 
 	Vector<Vector2i> vector_path;
+	// Make the painted path a set for faster lookups
+	HashSet<Vector2i> painted_set;
 	for (int i = 0; i < p_path.size(); i++) {
 		vector_path.push_back(p_path[i]);
+		painted_set.insert(p_path[i]);
 	}
 	HashMap<Vector2i, TileSet::TerrainsPattern> terrain_fill_output = terrain_fill_path(p_layer, vector_path, p_terrain_set, p_terrain, p_ignore_empty_terrains);
+	
+	
 	for (const KeyValue<Vector2i, TileSet::TerrainsPattern> &E : terrain_fill_output) {
-		TileMapCell c = tile_set->get_random_tile_from_terrains_pattern(p_terrain_set, E.value);
-		set_cell(p_layer, E.key, c.source_id, c.get_atlas_coords(), c.alternative_tile);
+		if (painted_set.has(E.key)) {
+			// Paint a random tile with the correct terrain for the painted path.
+			TileMapCell new_cell = tile_set->get_random_tile_from_terrains_pattern(p_terrain_set, E.value);
+			set_cell(p_layer, E.key, new_cell.source_id, new_cell.get_atlas_coords(), new_cell.alternative_tile);
+		} else {
+			// Avoids updating the painted path from the output if the new pattern is the same as before.
+			bool keep_old = false;
+			TileMapCell cell = get_cell(p_layer, E.key);
+			if (cell.source_id != TileSet::INVALID_SOURCE) {
+				TileSetSource *source = *tile_set->get_source(cell.source_id);
+				TileSetAtlasSource *atlas_source = Object::cast_to<TileSetAtlasSource>(source);
+				if (atlas_source) {
+					// Get tile data.
+					TileData *tile_data = atlas_source->get_tile_data(cell.get_atlas_coords(), cell.alternative_tile);
+					if (tile_data && tile_data->get_terrains_pattern() == E.value) {
+						keep_old = true;
+					}
+				}
+			}
+			if (!keep_old) {
+				TileMapCell new_cell = tile_set->get_random_tile_from_terrains_pattern(p_terrain_set, E.value);
+				set_cell(p_layer, E.key, new_cell.source_id, new_cell.get_atlas_coords(), new_cell.alternative_tile);
+			}
+		}
 	}
 }
 
