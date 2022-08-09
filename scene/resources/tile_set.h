@@ -820,7 +820,7 @@ private:
 	Vector<Variant> custom_data;
 
 	// Parent data (alternatives only)
-	const TileData* parent_tile;
+	const TileData* parent_tile = nullptr;
 
 protected:
 	bool _set(const StringName &p_name, const Variant &p_value);

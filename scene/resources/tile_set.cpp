@@ -4854,6 +4854,7 @@ namespace {
 
 void TileData::update_inherited_polygons() {
 	ERR_FAIL_COND_MSG(is_primary, "Inherited polygon rotations are only allowed for alternative tiles (with its alternative_id != 0)");
+	ERR_FAIL_NULL_MSG(parent_tile, "No parent tile found when updating alternative tile");
 	// Update navigation poly
 	navigation.clear();
 	for (int i = 0; i < parent_tile->navigation.size(); i++) {
