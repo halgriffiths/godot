@@ -4833,7 +4833,7 @@ void TileSetScenesCollectionSource::_bind_methods() {
 /////////////////////////////// TileData //////////////////////////////////////
 
 namespace {
-	Vector<Point2> rotate_polygon(Vector<Point2>& original_polygon, bool flip_h, bool flip_v, bool transpose) {
+	Vector<Point2> transform_polygon(Vector<Point2>& original_polygon, bool flip_h, bool flip_v, bool transpose) {
 		Vector<Point2> new_polygon;
 		for (int point_index = 0; point_index < original_polygon.size(); point_index++) {
 			Vector2 point = original_polygon[point_index];
@@ -4861,7 +4861,7 @@ void TileData::update_inherited_polygons() {
 		if (parent_tile->navigation[i].is_valid()) {
 			Ref<NavigationPolygon> new_nav_poly = Ref<NavigationPolygon>(memnew(NavigationPolygon));
 			for (int j = 0; j < parent_tile->navigation[i]->get_outline_count(); j++) {
-				new_nav_poly->add_outline(rotate_polygon(parent_tile->navigation[i]->get_outline(j), flip_h, flip_v, transpose));
+				new_nav_poly->add_outline(transform_polygon(parent_tile->navigation[i]->get_outline(j), flip_h, flip_v, transpose));
 				
 			// Regenerate polygons & vertices
 			new_nav_poly->make_polygons_from_outlines();
@@ -4877,7 +4877,7 @@ void TileData::update_inherited_polygons() {
 		add_physics_layer(i);
 		for (int j = 0; j < parent_tile->physics[i].polygons.size(); j++) {
 			add_collision_polygon(i);
-			set_collision_polygon_points(i, j, rotate_polygon(parent_tile->get_collision_polygon_points(i, j), flip_h, flip_v, transpose));
+			set_collision_polygon_points(i, j, transform_polygon(parent_tile->get_collision_polygon_points(i, j), flip_h, flip_v, transpose));
 		}
 	}
 }
