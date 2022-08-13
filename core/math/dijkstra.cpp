@@ -427,7 +427,10 @@ Vector<Vector3> Dijkstra3D::get_point_path(int64_t p_from_id) {
 	Point *p = begin_point;
 	int64_t pc = 1; // Begin point
 	while (p != end_point) {
-		ERR_FAIL_COND_V_MSG(p->tentative_distance == INFINITY, Vector<Vector3>(), vformat("Can't get id path. Destination point with id: %d unreachable from %d.", target_id, p_from_id));
+		if (p->tentative_distance == INFINITY || !p->enabled || p->closed_pass != pass) {
+			// Path not found
+			return Vector<Vector3>();
+		}
 		pc++;
 		p = p->prev_point;
 	}
@@ -471,8 +474,10 @@ Vector<int64_t> Dijkstra3D::get_id_path(int64_t p_from_id) {
 	Point *p = begin_point;
 	int64_t pc = 1; // Begin point
 	while (p != end_point) {
-		ERR_FAIL_COND_V_MSG(p->tentative_distance == INFINITY, Vector<int64_t>(), vformat("Can't get id path. Destination point with id: %d unreachable from %d.", target_id, p_from_id));
-
+		if (p->tentative_distance == INFINITY || !p->enabled || p->closed_pass != pass) {
+			// Path not found
+			return Vector<int64_t>();
+		}
 		pc++;
 		p = p->prev_point;
 	}
@@ -704,8 +709,10 @@ Vector<Vector2> Dijkstra2D::get_point_path(int64_t p_from_id) {
 	Dijkstra3D::Point *p = begin_point;
 	int64_t pc = 1; // Begin point
 	while (p != end_point) {
-		ERR_FAIL_COND_V_MSG(p->tentative_distance == INFINITY, Vector<Vector2>(), vformat("Can't get id path. Destination point with id: %d unreachable from %d.", dijkstra.target_id, p_from_id));
-
+		if (p->tentative_distance == INFINITY || !p->enabled || p->closed_pass != dijkstra.pass) {
+			// Path not found
+			return Vector<Vector2>();
+		}
 		pc++;
 		p = p->prev_point;
 	}
@@ -749,8 +756,10 @@ Vector<int64_t> Dijkstra2D::get_id_path(int64_t p_from_id) {
 	Dijkstra3D::Point *p = begin_point;
 	int64_t pc = 1; // Begin point
 	while (p != end_point) {
-		ERR_FAIL_COND_V_MSG(p->tentative_distance == INFINITY, Vector<int64_t>(), vformat("Can't get id path. Destination point with id: %d unreachable from %d.", dijkstra.target_id, p_from_id));
-
+		if (p->tentative_distance == INFINITY || !p->enabled || p->closed_pass != dijkstra.pass) {
+			// Path not found
+			return Vector<int64_t>();
+		}
 		pc++;
 		p = p->prev_point;
 	}
