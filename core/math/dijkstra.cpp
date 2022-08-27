@@ -441,7 +441,7 @@ Vector<Vector3> Dijkstra3D::get_point_path(int64_t p_from_id) {
 		Vector3 *w = path.ptrw();
 
 		Point *p2 = begin_point;
-		int64_t idx = pc - 1;
+		int64_t idx = 0;
 		while (p2 != end_point) {
 			w[idx++] = p2->pos;
 			p2 = p2->prev_point;
@@ -472,7 +472,7 @@ Vector<int64_t> Dijkstra3D::get_id_path(int64_t p_from_id) {
 	Point *end_point = b;
 
 	Point *p = begin_point;
-	int64_t pc = 1; // Begin point
+	int64_t pc = 0; // Begin point
 	while (p != end_point) {
 		if (p->tentative_distance == INFINITY || !p->enabled || p->closed_pass != pass) {
 			// Path not found
@@ -488,7 +488,7 @@ Vector<int64_t> Dijkstra3D::get_id_path(int64_t p_from_id) {
 		int64_t *w = path.ptrw();
 
 		p = begin_point;
-		int64_t idx = pc - 1;
+		int64_t idx = 0;
 		while (p != end_point) {
 			w[idx++] = p->id;
 			p = p->prev_point;
