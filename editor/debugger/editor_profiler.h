@@ -122,6 +122,7 @@ private:
 	Timer *frame_delay = nullptr;
 	Timer *plot_delay = nullptr;
 
+	void _set_button_text();
 	void _update_frame();
 
 	void _activate_pressed();
