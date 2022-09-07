@@ -117,6 +117,10 @@ class GridMap : public Node3D {
 		HashSet<IndexKey> cells;
 		RID collision_debug;
 		RID collision_debug_instance;
+#ifdef DEBUG_ENABLED
+		RID navigation_debug_edge_connections_instance;
+		Ref<ArrayMesh> navigation_debug_edge_connections_mesh;
+#endif // DEBUG_ENABLED
 
 		bool dirty = false;
 		RID static_body;
@@ -186,6 +190,11 @@ class GridMap : public Node3D {
 	bool _octant_update(const OctantKey &p_key);
 	void _octant_clean_up(const OctantKey &p_key);
 	void _octant_transform(const OctantKey &p_key);
+#ifdef DEBUG_ENABLED
+	void _update_octant_navigation_debug_edge_connections_mesh(const OctantKey &p_key);
+	void _navigation_map_changed(RID p_map);
+	void _update_navigation_debug_edge_connections();
+#endif // DEBUG_ENABLED
 	bool awaiting_update = false;
 
 	void _queue_octants_dirty();
@@ -267,8 +276,8 @@ public:
 	Basis get_basis_with_orthogonal_index(int p_index) const;
 	int get_orthogonal_index_from_basis(const Basis &p_basis) const;
 
-	Vector3i world_to_map(const Vector3 &p_world_position) const;
-	Vector3 map_to_world(const Vector3i &p_map_position) const;
+	Vector3i local_to_map(const Vector3 &p_local_position) const;
+	Vector3 map_to_local(const Vector3i &p_map_position) const;
 
 	void set_cell_scale(float p_scale);
 	float get_cell_scale() const;

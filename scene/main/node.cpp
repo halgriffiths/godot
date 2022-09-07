@@ -951,14 +951,11 @@ String Node::validate_child_name(Node *p_child) {
 String Node::adjust_name_casing(const String &p_name) {
 	switch (GLOBAL_GET("editor/node_naming/name_casing").operator int()) {
 		case NAME_CASING_PASCAL_CASE:
-			return p_name.capitalize().replace(" ", "");
-		case NAME_CASING_CAMEL_CASE: {
-			String name = p_name.capitalize().replace(" ", "");
-			name[0] = name.to_lower()[0];
-			return name;
-		}
+			return p_name.to_pascal_case();
+		case NAME_CASING_CAMEL_CASE:
+			return p_name.to_camel_case();
 		case NAME_CASING_SNAKE_CASE:
-			return p_name.capitalize().replace(" ", "_").to_lower();
+			return p_name.to_snake_case();
 	}
 	return p_name;
 }
@@ -1134,7 +1131,7 @@ void Node::_add_child_nocheck(Node *p_child, const StringName &p_name) {
 	add_child_notify(p_child);
 }
 
-void Node::add_child(Node *p_child, bool p_legible_unique_name, InternalMode p_internal) {
+void Node::add_child(Node *p_child, bool p_force_readable_name, InternalMode p_internal) {
 	ERR_FAIL_NULL(p_child);
 	ERR_FAIL_COND_MSG(p_child == this, vformat("Can't add child '%s' to itself.", p_child->get_name())); // adding to itself!
 	ERR_FAIL_COND_MSG(p_child->data.parent, vformat("Can't add child '%s' to '%s', already has a parent '%s'.", p_child->get_name(), get_name(), p_child->data.parent->get_name())); //Fail if node has a parent
@@ -1143,7 +1140,7 @@ void Node::add_child(Node *p_child, bool p_legible_unique_name, InternalMode p_i
 #endif
 	ERR_FAIL_COND_MSG(data.blocked > 0, "Parent node is busy setting up children, add_node() failed. Consider using call_deferred(\"add_child\", child) instead.");
 
-	_validate_child_name(p_child, p_legible_unique_name);
+	_validate_child_name(p_child, p_force_readable_name);
 	_add_child_nocheck(p_child, p_child->data.name);
 
 	if (p_internal == INTERNAL_MODE_FRONT) {
@@ -1157,7 +1154,7 @@ void Node::add_child(Node *p_child, bool p_legible_unique_name, InternalMode p_i
 	}
 }
 
-void Node::add_sibling(Node *p_sibling, bool p_legible_unique_name) {
+void Node::add_sibling(Node *p_sibling, bool p_force_readable_name) {
 	ERR_FAIL_NULL(p_sibling);
 	ERR_FAIL_NULL(data.parent);
 	ERR_FAIL_COND_MSG(p_sibling == this, vformat("Can't add sibling '%s' to itself.", p_sibling->get_name())); // adding to itself!
@@ -1170,7 +1167,7 @@ void Node::add_sibling(Node *p_sibling, bool p_legible_unique_name) {
 		internal = INTERNAL_MODE_BACK;
 	}
 
-	data.parent->add_child(p_sibling, p_legible_unique_name, internal);
+	data.parent->add_child(p_sibling, p_force_readable_name, internal);
 	data.parent->_move_child(p_sibling, get_index() + 1);
 }
 
@@ -2790,11 +2787,11 @@ void Node::_bind_methods() {
 	GLOBAL_DEF("editor/node_naming/name_casing", NAME_CASING_PASCAL_CASE);
 	ProjectSettings::get_singleton()->set_custom_property_info("editor/node_naming/name_casing", PropertyInfo(Variant::INT, "editor/node_naming/name_casing", PROPERTY_HINT_ENUM, "PascalCase,camelCase,snake_case"));
 
-	ClassDB::bind_method(D_METHOD("add_sibling", "sibling", "legible_unique_name"), &Node::add_sibling, DEFVAL(false));
+	ClassDB::bind_method(D_METHOD("add_sibling", "sibling", "force_readable_name"), &Node::add_sibling, DEFVAL(false));
 
 	ClassDB::bind_method(D_METHOD("set_name", "name"), &Node::set_name);
 	ClassDB::bind_method(D_METHOD("get_name"), &Node::get_name);
-	ClassDB::bind_method(D_METHOD("add_child", "node", "legible_unique_name", "internal"), &Node::add_child, DEFVAL(false), DEFVAL(0));
+	ClassDB::bind_method(D_METHOD("add_child", "node", "force_readable_name", "internal"), &Node::add_child, DEFVAL(false), DEFVAL(0));
 	ClassDB::bind_method(D_METHOD("remove_child", "node"), &Node::remove_child);
 	ClassDB::bind_method(D_METHOD("get_child_count", "include_internal"), &Node::get_child_count, DEFVAL(false)); // Note that the default value bound for include_internal is false, while the method is declared with true. This is because internal nodes are irrelevant for GDSCript.
 	ClassDB::bind_method(D_METHOD("get_children", "include_internal"), &Node::_get_children, DEFVAL(false));
@@ -2926,7 +2923,7 @@ void Node::_bind_methods() {
 	BIND_CONSTANT(NOTIFICATION_PROCESS);
 	BIND_CONSTANT(NOTIFICATION_PARENTED);
 	BIND_CONSTANT(NOTIFICATION_UNPARENTED);
-	BIND_CONSTANT(NOTIFICATION_INSTANCED);
+	BIND_CONSTANT(NOTIFICATION_SCENE_INSTANTIATED);
 	BIND_CONSTANT(NOTIFICATION_DRAG_BEGIN);
 	BIND_CONSTANT(NOTIFICATION_DRAG_END);
 	BIND_CONSTANT(NOTIFICATION_PATH_RENAMED);

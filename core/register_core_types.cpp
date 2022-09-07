@@ -58,12 +58,13 @@
 #include "core/io/resource_format_binary.h"
 #include "core/io/resource_importer.h"
 #include "core/io/resource_uid.h"
-#include "core/io/stream_peer_ssl.h"
+#include "core/io/stream_peer_tls.h"
 #include "core/io/tcp_server.h"
 #include "core/io/translation_loader_po.h"
 #include "core/io/udp_server.h"
 #include "core/io/xml_parser.h"
 #include "core/math/a_star.h"
+#include "core/math/a_star_grid_2d.h"
 #include "core/math/dijkstra.h"
 #include "core/math/expression.h"
 #include "core/math/geometry_2d.h"
@@ -202,7 +203,7 @@ void register_core_types() {
 	ClassDB::register_custom_instance_class<CryptoKey>();
 	ClassDB::register_custom_instance_class<HMACContext>();
 	ClassDB::register_custom_instance_class<Crypto>();
-	ClassDB::register_custom_instance_class<StreamPeerSSL>();
+	ClassDB::register_custom_instance_class<StreamPeerTLS>();
 	ClassDB::register_custom_instance_class<PacketPeerDTLS>();
 	ClassDB::register_custom_instance_class<DTLSServer>();
 
@@ -237,6 +238,7 @@ void register_core_types() {
 	GDREGISTER_ABSTRACT_CLASS(PackedDataContainerRef);
 	GDREGISTER_CLASS(AStar3D);
 	GDREGISTER_CLASS(AStar2D);
+	GDREGISTER_CLASS(AStarGrid2D);
 	GDREGISTER_CLASS(Dijkstra3D);
 	GDREGISTER_CLASS(Dijkstra2D);
 	GDREGISTER_CLASS(EncodedObjectAsID);

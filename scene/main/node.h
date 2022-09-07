@@ -259,7 +259,7 @@ public:
 		NOTIFICATION_PROCESS = 17,
 		NOTIFICATION_PARENTED = 18,
 		NOTIFICATION_UNPARENTED = 19,
-		NOTIFICATION_INSTANCED = 20,
+		NOTIFICATION_SCENE_INSTANTIATED = 20,
 		NOTIFICATION_DRAG_BEGIN = 21,
 		NOTIFICATION_DRAG_END = 22,
 		NOTIFICATION_PATH_RENAMED = 23,
@@ -303,8 +303,8 @@ public:
 	StringName get_name() const;
 	void set_name(const String &p_name);
 
-	void add_child(Node *p_child, bool p_legible_unique_name = false, InternalMode p_internal = INTERNAL_MODE_DISABLED);
-	void add_sibling(Node *p_sibling, bool p_legible_unique_name = false);
+	void add_child(Node *p_child, bool p_force_readable_name = false, InternalMode p_internal = INTERNAL_MODE_DISABLED);
+	void add_sibling(Node *p_sibling, bool p_force_readable_name = false);
 	void remove_child(Node *p_child);
 
 	int get_child_count(bool p_include_internal = true) const;

@@ -206,7 +206,7 @@ EditorHelpSearch::EditorHelpSearch() {
 
 	case_sensitive_button = memnew(Button);
 	case_sensitive_button->set_flat(true);
-	case_sensitive_button->set_tooltip(TTR("Case Sensitive"));
+	case_sensitive_button->set_tooltip_text(TTR("Case Sensitive"));
 	case_sensitive_button->connect("pressed", callable_mp(this, &EditorHelpSearch::_update_results));
 	case_sensitive_button->set_toggle_mode(true);
 	case_sensitive_button->set_focus_mode(Control::FOCUS_NONE);
@@ -214,7 +214,7 @@ EditorHelpSearch::EditorHelpSearch() {
 
 	hierarchy_button = memnew(Button);
 	hierarchy_button->set_flat(true);
-	hierarchy_button->set_tooltip(TTR("Show Hierarchy"));
+	hierarchy_button->set_tooltip_text(TTR("Show Hierarchy"));
 	hierarchy_button->connect("pressed", callable_mp(this, &EditorHelpSearch::_update_results));
 	hierarchy_button->set_toggle_mode(true);
 	hierarchy_button->set_pressed(true);
@@ -231,6 +231,7 @@ EditorHelpSearch::EditorHelpSearch() {
 	filter_combo->add_item(TTR("Methods Only"), SEARCH_METHODS);
 	filter_combo->add_item(TTR("Operators Only"), SEARCH_OPERATORS);
 	filter_combo->add_item(TTR("Signals Only"), SEARCH_SIGNALS);
+	filter_combo->add_item(TTR("Annotations Only"), SEARCH_ANNOTATIONS);
 	filter_combo->add_item(TTR("Constants Only"), SEARCH_CONSTANTS);
 	filter_combo->add_item(TTR("Properties Only"), SEARCH_PROPERTIES);
 	filter_combo->add_item(TTR("Theme Properties Only"), SEARCH_THEME_ITEMS);
@@ -339,8 +340,9 @@ bool EditorHelpSearch::Runner::_phase_match_classes() {
 			match.name = (term.is_empty() && (!class_doc.is_script_doc || class_doc.name[0] != '\"')) || _match_string(term, class_doc.name);
 		}
 
-		// Match members if the term is long enough.
-		if (term.length() > 1) {
+		// Match members only if the term is long enough, to avoid slow performance from building a large tree.
+		// Make an exception for annotations, since there are not that many of them.
+		if (term.length() > 1 || term == "@") {
 			if (search_flags & SEARCH_CONSTRUCTORS) {
 				for (int i = 0; i < class_doc.constructors.size(); i++) {
 					String method_name = (search_flags & SEARCH_CASE_SENSITIVE) ? class_doc.constructors[i].name : class_doc.constructors[i].name.to_lower();
@@ -399,6 +401,13 @@ bool EditorHelpSearch::Runner::_phase_match_classes() {
 				for (int i = 0; i < class_doc.theme_properties.size(); i++) {
 					if (_match_string(term, class_doc.theme_properties[i].name)) {
 						match.theme_properties.push_back(const_cast<DocData::ThemeItemDoc *>(&class_doc.theme_properties[i]));
+					}
+				}
+			}
+			if (search_flags & SEARCH_ANNOTATIONS) {
+				for (int i = 0; i < class_doc.annotations.size(); i++) {
+					if (_match_string(term, class_doc.annotations[i].name)) {
+						match.annotations.push_back(const_cast<DocData::MethodDoc *>(&class_doc.annotations[i]));
 					}
 				}
 			}
@@ -485,6 +494,10 @@ bool EditorHelpSearch::Runner::_phase_member_items() {
 	for (int i = 0; i < match.theme_properties.size(); i++) {
 		_create_theme_property_item(parent, match.doc, match.theme_properties[i]);
 	}
+	for (int i = 0; i < match.annotations.size(); i++) {
+		// Hide the redundant leading @ symbol.
+		_create_annotation_item(parent, match.doc, match.annotations[i]->name.substr(1), match.annotations[i]);
+	}
 
 	++iterator_match;
 	return !iterator_match;
@@ -521,6 +534,22 @@ void EditorHelpSearch::Runner::_match_item(TreeItem *p_item, const String &p_tex
 		matched_item = p_item;
 		match_highest_score = score;
 	}
+}
+
+String EditorHelpSearch::Runner::_build_method_tooltip(const DocData::ClassDoc *p_class_doc, const DocData::MethodDoc *p_doc) const {
+	String tooltip = p_doc->return_type + " " + p_class_doc->name + "." + p_doc->name + "(";
+	for (int i = 0; i < p_doc->arguments.size(); i++) {
+		const DocData::ArgumentDoc &arg = p_doc->arguments[i];
+		tooltip += arg.type + " " + arg.name;
+		if (!arg.default_value.is_empty()) {
+			tooltip += " = " + arg.default_value;
+		}
+		if (i < p_doc->arguments.size() - 1) {
+			tooltip += ", ";
+		}
+	}
+	tooltip += ")";
+	return tooltip;
 }
 
 TreeItem *EditorHelpSearch::Runner::_create_class_hierarchy(const ClassMatch &p_match) {
@@ -562,8 +591,8 @@ TreeItem *EditorHelpSearch::Runner::_create_class_item(TreeItem *p_parent, const
 	item->set_icon(0, icon);
 	item->set_text(0, p_doc->name);
 	item->set_text(1, TTR("Class"));
-	item->set_tooltip(0, tooltip);
-	item->set_tooltip(1, tooltip);
+	item->set_tooltip_text(0, tooltip);
+	item->set_tooltip_text(1, tooltip);
 	item->set_metadata(0, "class_name:" + p_doc->name);
 	if (p_gray) {
 		item->set_custom_color(0, disabled_color);
@@ -576,35 +605,18 @@ TreeItem *EditorHelpSearch::Runner::_create_class_item(TreeItem *p_parent, const
 }
 
 TreeItem *EditorHelpSearch::Runner::_create_method_item(TreeItem *p_parent, const DocData::ClassDoc *p_class_doc, const String &p_text, const DocData::MethodDoc *p_doc) {
-	String tooltip = p_doc->return_type + " " + p_class_doc->name + "." + p_doc->name + "(";
-	for (int i = 0; i < p_doc->arguments.size(); i++) {
-		const DocData::ArgumentDoc &arg = p_doc->arguments[i];
-		tooltip += arg.type + " " + arg.name;
-		if (!arg.default_value.is_empty()) {
-			tooltip += " = " + arg.default_value;
-		}
-		if (i < p_doc->arguments.size() - 1) {
-			tooltip += ", ";
-		}
-	}
-	tooltip += ")";
+	String tooltip = _build_method_tooltip(p_class_doc, p_doc);
 	return _create_member_item(p_parent, p_class_doc->name, "MemberMethod", p_doc->name, p_text, TTRC("Method"), "method", tooltip);
 }
 
 TreeItem *EditorHelpSearch::Runner::_create_signal_item(TreeItem *p_parent, const DocData::ClassDoc *p_class_doc, const DocData::MethodDoc *p_doc) {
-	String tooltip = p_doc->return_type + " " + p_class_doc->name + "." + p_doc->name + "(";
-	for (int i = 0; i < p_doc->arguments.size(); i++) {
-		const DocData::ArgumentDoc &arg = p_doc->arguments[i];
-		tooltip += arg.type + " " + arg.name;
-		if (!arg.default_value.is_empty()) {
-			tooltip += " = " + arg.default_value;
-		}
-		if (i < p_doc->arguments.size() - 1) {
-			tooltip += ", ";
-		}
-	}
-	tooltip += ")";
+	String tooltip = _build_method_tooltip(p_class_doc, p_doc);
 	return _create_member_item(p_parent, p_class_doc->name, "MemberSignal", p_doc->name, p_doc->name, TTRC("Signal"), "signal", tooltip);
+}
+
+TreeItem *EditorHelpSearch::Runner::_create_annotation_item(TreeItem *p_parent, const DocData::ClassDoc *p_class_doc, const String &p_text, const DocData::MethodDoc *p_doc) {
+	String tooltip = _build_method_tooltip(p_class_doc, p_doc);
+	return _create_member_item(p_parent, p_class_doc->name, "MemberAnnotation", p_doc->name, p_text, TTRC("Annotation"), "annotation", tooltip);
 }
 
 TreeItem *EditorHelpSearch::Runner::_create_constant_item(TreeItem *p_parent, const DocData::ClassDoc *p_class_doc, const DocData::ConstantDoc *p_doc) {
@@ -639,8 +651,8 @@ TreeItem *EditorHelpSearch::Runner::_create_member_item(TreeItem *p_parent, cons
 	item->set_icon(0, icon);
 	item->set_text(0, text);
 	item->set_text(1, TTRGET(p_type));
-	item->set_tooltip(0, p_tooltip);
-	item->set_tooltip(1, p_tooltip);
+	item->set_tooltip_text(0, p_tooltip);
+	item->set_tooltip_text(1, p_tooltip);
 	item->set_metadata(0, "class_" + p_metatype + ":" + p_class_name + ":" + p_name);
 
 	_match_item(item, p_name);

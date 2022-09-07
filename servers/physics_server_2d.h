@@ -610,7 +610,7 @@ protected:
 	static void _bind_methods();
 
 public:
-	static Ref<PhysicsRayQueryParameters2D> create(Vector2 p_from, Vector2 p_to, uint32_t p_mask, const Vector<RID> &p_exclude);
+	static Ref<PhysicsRayQueryParameters2D> create(Vector2 p_from, Vector2 p_to, uint32_t p_mask, const TypedArray<RID> &p_exclude);
 	const PhysicsDirectSpaceState2D::RayParameters &get_parameters() const { return parameters; }
 
 	void set_from(const Vector2 &p_from) { parameters.from = p_from; }
@@ -631,8 +631,8 @@ public:
 	void set_hit_from_inside(bool p_enable) { parameters.hit_from_inside = p_enable; }
 	bool is_hit_from_inside_enabled() const { return parameters.hit_from_inside; }
 
-	void set_exclude(const Vector<RID> &p_exclude);
-	Vector<RID> get_exclude() const;
+	void set_exclude(const TypedArray<RID> &p_exclude);
+	TypedArray<RID> get_exclude() const;
 };
 
 class PhysicsPointQueryParameters2D : public RefCounted {
@@ -661,8 +661,8 @@ public:
 	void set_collide_with_areas(bool p_enable) { parameters.collide_with_areas = p_enable; }
 	bool is_collide_with_areas_enabled() const { return parameters.collide_with_areas; }
 
-	void set_exclude(const Vector<RID> &p_exclude);
-	Vector<RID> get_exclude() const;
+	void set_exclude(const TypedArray<RID> &p_exclude);
+	TypedArray<RID> get_exclude() const;
 };
 
 class PhysicsShapeQueryParameters2D : public RefCounted {
@@ -702,8 +702,8 @@ public:
 	void set_collide_with_areas(bool p_enable) { parameters.collide_with_areas = p_enable; }
 	bool is_collide_with_areas_enabled() const { return parameters.collide_with_areas; }
 
-	void set_exclude(const Vector<RID> &p_exclude);
-	Vector<RID> get_exclude() const;
+	void set_exclude(const TypedArray<RID> &p_exclude);
+	TypedArray<RID> get_exclude() const;
 };
 
 class PhysicsTestMotionParameters2D : public RefCounted {
@@ -729,8 +729,8 @@ public:
 	bool is_collide_separation_ray_enabled() const { return parameters.collide_separation_ray; }
 	void set_collide_separation_ray_enabled(bool p_enabled) { parameters.collide_separation_ray = p_enabled; }
 
-	Vector<RID> get_exclude_bodies() const;
-	void set_exclude_bodies(const Vector<RID> &p_exclude);
+	TypedArray<RID> get_exclude_bodies() const;
+	void set_exclude_bodies(const TypedArray<RID> &p_exclude);
 
 	Array get_exclude_objects() const;
 	void set_exclude_objects(const Array &p_exclude);
@@ -766,16 +766,18 @@ public:
 	real_t get_collision_unsafe_fraction() const;
 };
 
-typedef PhysicsServer2D *(*CreatePhysicsServer2DCallback)();
+class PhysicsServer2DManager : public Object {
+	GDCLASS(PhysicsServer2DManager, Object);
 
-class PhysicsServer2DManager {
+	static PhysicsServer2DManager *singleton;
+
 	struct ClassInfo {
 		String name;
-		CreatePhysicsServer2DCallback create_callback = nullptr;
+		Callable create_callback;
 
 		ClassInfo() {}
 
-		ClassInfo(String p_name, CreatePhysicsServer2DCallback p_create_callback) :
+		ClassInfo(String p_name, Callable p_create_callback) :
 				name(p_name),
 				create_callback(p_create_callback) {}
 
@@ -789,24 +791,30 @@ class PhysicsServer2DManager {
 		}
 	};
 
-	static Vector<ClassInfo> physics_2d_servers;
-	static int default_server_id;
-	static int default_server_priority;
+	Vector<ClassInfo> physics_2d_servers;
+	int default_server_id = -1;
+	int default_server_priority = -1;
+
+	void on_servers_changed();
+
+protected:
+	static void _bind_methods();
 
 public:
 	static const String setting_property_name;
 
-private:
-	static void on_servers_changed();
+	static PhysicsServer2DManager *get_singleton();
 
-public:
-	static void register_server(const String &p_name, CreatePhysicsServer2DCallback p_creat_callback);
-	static void set_default_server(const String &p_name, int p_priority = 0);
-	static int find_server_id(const String &p_name);
-	static int get_servers_count();
-	static String get_server_name(int p_id);
-	static PhysicsServer2D *new_default_server();
-	static PhysicsServer2D *new_server(const String &p_name);
+	void register_server(const String &p_name, const Callable &p_create_callback);
+	void set_default_server(const String &p_name, int p_priority = 0);
+	int find_server_id(const String &p_name);
+	int get_servers_count();
+	String get_server_name(int p_id);
+	PhysicsServer2D *new_default_server();
+	PhysicsServer2D *new_server(const String &p_name);
+
+	PhysicsServer2DManager();
+	~PhysicsServer2DManager();
 };
 
 VARIANT_ENUM_CAST(PhysicsServer2D::ShapeType);
@@ -820,6 +828,7 @@ VARIANT_ENUM_CAST(PhysicsServer2D::BodyState);
 VARIANT_ENUM_CAST(PhysicsServer2D::CCDMode);
 VARIANT_ENUM_CAST(PhysicsServer2D::JointParam);
 VARIANT_ENUM_CAST(PhysicsServer2D::JointType);
+VARIANT_ENUM_CAST(PhysicsServer2D::PinJointParam);
 VARIANT_ENUM_CAST(PhysicsServer2D::DampedSpringParam);
 VARIANT_ENUM_CAST(PhysicsServer2D::AreaBodyStatus);
 VARIANT_ENUM_CAST(PhysicsServer2D::ProcessInfo);

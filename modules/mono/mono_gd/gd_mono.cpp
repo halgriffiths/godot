@@ -43,12 +43,13 @@
 #include "../utils/path_utils.h"
 #include "gd_mono_cache.h"
 
+#include "../thirdparty/coreclr_delegates.h"
+#include "../thirdparty/hostfxr.h"
+
 #ifdef TOOLS_ENABLED
-#include <nethost.h>
+#include "../editor/hostfxr_resolver.h"
 #endif
 
-#include <coreclr_delegates.h>
-#include <hostfxr.h>
 #ifdef UNIX_ENABLED
 #include <dlfcn.h>
 #endif
@@ -88,98 +89,56 @@ HostFxrCharString str_to_hostfxr(const String &p_str) {
 #endif
 }
 
-#ifdef TOOLS_ENABLED
-String str_from_hostfxr(const char_t *p_buffer) {
-#ifdef _WIN32
-	return String::utf16((const char16_t *)p_buffer);
-#else
-	return String::utf8((const char *)p_buffer);
-#endif
-}
-#endif
-
 const char_t *get_data(const HostFxrCharString &p_char_str) {
 	return (const char_t *)p_char_str.get_data();
 }
 
-#ifdef TOOLS_ENABLED
-String find_hostfxr(size_t p_known_buffet_size, get_hostfxr_parameters *p_get_hostfxr_params) {
-	// Pre-allocate a large buffer for the path to hostfxr
-	Vector<char_t> buffer;
-	buffer.resize(p_known_buffet_size);
-
-	int rc = get_hostfxr_path(buffer.ptrw(), &p_known_buffet_size, p_get_hostfxr_params);
-
-	ERR_FAIL_COND_V_MSG(rc != 0, String(), "get_hostfxr_path failed with code: " + itos(rc));
-
-	return str_from_hostfxr(buffer.ptr());
-}
-#endif
-
 String find_hostfxr() {
 #ifdef TOOLS_ENABLED
-	const int CoreHostLibMissingFailure = 0x80008083;
-	const int HostApiBufferTooSmall = 0x80008098;
-
-	size_t buffer_size = 0;
-	int rc = get_hostfxr_path(nullptr, &buffer_size, nullptr);
-
-	if (rc == HostApiBufferTooSmall) {
-		return find_hostfxr(buffer_size, nullptr);
+	String dotnet_root;
+	String fxr_path;
+	if (godotsharp::hostfxr_resolver::try_get_path(dotnet_root, fxr_path)) {
+		return fxr_path;
 	}
 
-	if (rc == CoreHostLibMissingFailure) {
-		// Apparently `get_hostfxr_path` doesn't look for dotnet in `PATH`? (I suppose it needs the
-		// `DOTNET_ROOT` environment variable). If it fails, we try to find the dotnet executable
-		// in `PATH` ourselves and pass its location as `dotnet_root` to `get_hostfxr_path`.
-		String dotnet_exe = path::find_executable("dotnet");
+	// hostfxr_resolver doesn't look for dotnet in `PATH`. If it fails, we try to find the dotnet
+	// executable in `PATH` here and pass its location as `dotnet_root` to `get_hostfxr_path`.
+	String dotnet_exe = path::find_executable("dotnet");
 
-		if (!dotnet_exe.is_empty()) {
-			// The file found in PATH may be a symlink
-			dotnet_exe = path::abspath(path::realpath(dotnet_exe));
+	if (!dotnet_exe.is_empty()) {
+		// The file found in PATH may be a symlink
+		dotnet_exe = path::abspath(path::realpath(dotnet_exe));
 
-			// TODO:
-			// Sometimes, the symlink may not point to the dotnet executable in the dotnet root.
-			// That's the case with snaps. The snap install should have been found with the
-			// previous `get_hostfxr_path`, but it would still be better to do this properly
-			// and use something like `dotnet --list-sdks/runtimes` to find the actual location.
-			// This way we could also check if the proper sdk or runtime is installed. This would
-			// allow us to fail gracefully and show some helpful information in the editor.
+		// TODO:
+		// Sometimes, the symlink may not point to the dotnet executable in the dotnet root.
+		// That's the case with snaps. The snap install should have been found with the
+		// previous `get_hostfxr_path`, but it would still be better to do this properly
+		// and use something like `dotnet --list-sdks/runtimes` to find the actual location.
+		// This way we could also check if the proper sdk or runtime is installed. This would
+		// allow us to fail gracefully and show some helpful information in the editor.
 
-			HostFxrCharString dotnet_root = str_to_hostfxr(dotnet_exe.get_base_dir());
-
-			get_hostfxr_parameters get_hostfxr_parameters = {
-				sizeof(get_hostfxr_parameters),
-				nullptr,
-				get_data(dotnet_root)
-			};
-
-			buffer_size = 0;
-			rc = get_hostfxr_path(nullptr, &buffer_size, &get_hostfxr_parameters);
-			if (rc == HostApiBufferTooSmall) {
-				return find_hostfxr(buffer_size, &get_hostfxr_parameters);
-			}
+		dotnet_root = dotnet_exe.get_base_dir();
+		if (godotsharp::hostfxr_resolver::try_get_path_from_dotnet_root(dotnet_root, fxr_path)) {
+			return fxr_path;
 		}
 	}
 
-	if (rc == CoreHostLibMissingFailure) {
-		ERR_PRINT(String() + ".NET: One of the dependent libraries is missing. " +
-				"Typically when the `hostfxr`, `hostpolicy` or `coreclr` dynamic " +
-				"libraries are not present in the expected locations.");
-	}
+	ERR_PRINT(String() + ".NET: One of the dependent libraries is missing. " +
+			"Typically when the `hostfxr`, `hostpolicy` or `coreclr` dynamic " +
+			"libraries are not present in the expected locations.");
 
 	return String();
 #else
 
 #if defined(WINDOWS_ENABLED)
 	String probe_path = GodotSharpDirs::get_api_assemblies_dir()
-								.plus_file("hostfxr.dll");
+								.path_join("hostfxr.dll");
 #elif defined(MACOS_ENABLED)
 	String probe_path = GodotSharpDirs::get_api_assemblies_dir()
-								.plus_file("libhostfxr.dylib");
+								.path_join("libhostfxr.dylib");
 #elif defined(UNIX_ENABLED)
 	String probe_path = GodotSharpDirs::get_api_assemblies_dir()
-								.plus_file("libhostfxr.so");
+								.path_join("libhostfxr.so");
 #else
 #error "Platform not supported (yet?)"
 #endif
@@ -270,7 +229,7 @@ load_assembly_and_get_function_pointer_fn initialize_hostfxr_self_contained(
 	int i = 1;
 	for (const String &E : cmdline_args) {
 		HostFxrCharString &stored = argv_store.push_back(str_to_hostfxr(E))->get();
-		argv.write[i] = stored.ptr();
+		argv.write[i] = get_data(stored);
 		i++;
 	}
 
@@ -305,10 +264,10 @@ godot_plugins_initialize_fn initialize_hostfxr_and_godot_plugins(bool &r_runtime
 	godot_plugins_initialize_fn godot_plugins_initialize = nullptr;
 
 	HostFxrCharString godot_plugins_path = str_to_hostfxr(
-			GodotSharpDirs::get_api_assemblies_dir().plus_file("GodotPlugins.dll"));
+			GodotSharpDirs::get_api_assemblies_dir().path_join("GodotPlugins.dll"));
 
 	HostFxrCharString config_path = str_to_hostfxr(
-			GodotSharpDirs::get_api_assemblies_dir().plus_file("GodotPlugins.runtimeconfig.json"));
+			GodotSharpDirs::get_api_assemblies_dir().path_join("GodotPlugins.runtimeconfig.json"));
 
 	load_assembly_and_get_function_pointer_fn load_assembly_and_get_function_pointer =
 			initialize_hostfxr_for_config(get_data(config_path));
@@ -345,7 +304,7 @@ godot_plugins_initialize_fn initialize_hostfxr_and_godot_plugins(bool &r_runtime
 	String assembly_name = get_assembly_name();
 
 	HostFxrCharString assembly_path = str_to_hostfxr(GodotSharpDirs::get_api_assemblies_dir()
-															 .plus_file(assembly_name + ".dll"));
+															 .path_join(assembly_name + ".dll"));
 
 	load_assembly_and_get_function_pointer_fn load_assembly_and_get_function_pointer =
 			initialize_hostfxr_self_contained(get_data(assembly_path));
@@ -356,7 +315,7 @@ godot_plugins_initialize_fn initialize_hostfxr_and_godot_plugins(bool &r_runtime
 	print_verbose(".NET: hostfxr initialized");
 
 	int rc = load_assembly_and_get_function_pointer(get_data(assembly_path),
-			str_to_hostfxr("GodotPlugins.Game.Main, " + assembly_name),
+			get_data(str_to_hostfxr("GodotPlugins.Game.Main, " + assembly_name)),
 			HOSTFXR_STR("InitializeFromGameProject"),
 			UNMANAGEDCALLERSONLY_METHOD,
 			nullptr,
@@ -370,11 +329,11 @@ godot_plugins_initialize_fn try_load_native_aot_library(void *&r_aot_dll_handle)
 	String assembly_name = get_assembly_name();
 
 #if defined(WINDOWS_ENABLED)
-	String native_aot_so_path = GodotSharpDirs::get_api_assemblies_dir().plus_file(assembly_name + ".dll");
+	String native_aot_so_path = GodotSharpDirs::get_api_assemblies_dir().path_join(assembly_name + ".dll");
 #elif defined(MACOS_ENABLED)
-	String native_aot_so_path = GodotSharpDirs::get_api_assemblies_dir().plus_file(assembly_name + ".dylib");
+	String native_aot_so_path = GodotSharpDirs::get_api_assemblies_dir().path_join(assembly_name + ".dylib");
 #elif defined(UNIX_ENABLED)
-	String native_aot_so_path = GodotSharpDirs::get_api_assemblies_dir().plus_file(assembly_name + ".so");
+	String native_aot_so_path = GodotSharpDirs::get_api_assemblies_dir().path_join(assembly_name + ".so");
 #else
 #error "Platform not supported (yet?)"
 #endif
@@ -514,7 +473,7 @@ bool GDMono::_load_project_assembly() {
 	}
 
 	String assembly_path = GodotSharpDirs::get_res_temp_assemblies_dir()
-								   .plus_file(assembly_name + ".dll");
+								   .path_join(assembly_name + ".dll");
 	assembly_path = ProjectSettings::get_singleton()->globalize_path(assembly_path);
 
 	if (!FileAccess::exists(assembly_path)) {

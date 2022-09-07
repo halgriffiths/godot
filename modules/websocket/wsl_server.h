@@ -31,13 +31,13 @@
 #ifndef WSL_SERVER_H
 #define WSL_SERVER_H
 
-#ifndef JAVASCRIPT_ENABLED
+#ifndef WEB_ENABLED
 
 #include "websocket_server.h"
 #include "wsl_peer.h"
 
-#include "core/io/stream_peer_ssl.h"
 #include "core/io/stream_peer_tcp.h"
+#include "core/io/stream_peer_tls.h"
 #include "core/io/tcp_server.h"
 
 class WSLServer : public WebSocketServer {
@@ -93,6 +93,6 @@ public:
 	~WSLServer();
 };
 
-#endif // JAVASCRIPT_ENABLED
+#endif // WEB_ENABLED
 
 #endif // WSL_SERVER_H

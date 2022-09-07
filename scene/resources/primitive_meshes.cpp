@@ -32,6 +32,7 @@
 
 #include "core/core_string_names.h"
 #include "scene/resources/theme.h"
+#include "scene/theme/theme_db.h"
 #include "servers/rendering_server.h"
 #include "thirdparty/misc/clipper.hpp"
 #include "thirdparty/misc/polypartition.h"
@@ -1821,7 +1822,7 @@ void TubeTrailMesh::_create_mesh_array(Array &p_arr) const {
 
 			float r = radius;
 			if (curve.is_valid() && curve->get_point_count() > 0) {
-				r *= curve->interpolate_baked(v);
+				r *= curve->sample_baked(v);
 			}
 			float x = sin(u * Math_TAU);
 			float z = cos(u * Math_TAU);
@@ -1862,7 +1863,7 @@ void TubeTrailMesh::_create_mesh_array(Array &p_arr) const {
 	// add top
 	float scale_pos = 1.0;
 	if (curve.is_valid() && curve->get_point_count() > 0) {
-		scale_pos = curve->interpolate_baked(0);
+		scale_pos = curve->sample_baked(0);
 	}
 
 	if (scale_pos > CMP_EPSILON) {
@@ -1924,7 +1925,7 @@ void TubeTrailMesh::_create_mesh_array(Array &p_arr) const {
 
 	float scale_neg = 1.0;
 	if (curve.is_valid() && curve->get_point_count() > 0) {
-		scale_neg = curve->interpolate_baked(1.0);
+		scale_neg = curve->sample_baked(1.0);
 	}
 
 	// add bottom
@@ -2137,7 +2138,7 @@ void RibbonTrailMesh::_create_mesh_array(Array &p_arr) const {
 		float s = size;
 
 		if (curve.is_valid() && curve->get_point_count() > 0) {
-			s *= curve->interpolate_baked(v);
+			s *= curve->sample_baked(v);
 		}
 
 		points.push_back(Vector3(-s * 0.5, y, 0));
@@ -2662,9 +2663,9 @@ void TextMesh::_create_mesh_array(Array &p_arr) const {
 							vertices_ptr[p_idx] = point;
 							normals_ptr[p_idx] = Vector3(0.0, 0.0, 1.0);
 							if (has_depth) {
-								uvs_ptr[p_idx] = Vector2(Math::range_lerp(point.x, min_p.x, max_p.x, real_t(0.0), real_t(1.0)), Math::range_lerp(point.y, -max_p.y, -min_p.y, real_t(0.4), real_t(0.0)));
+								uvs_ptr[p_idx] = Vector2(Math::remap(point.x, min_p.x, max_p.x, real_t(0.0), real_t(1.0)), Math::remap(point.y, -max_p.y, -min_p.y, real_t(0.4), real_t(0.0)));
 							} else {
-								uvs_ptr[p_idx] = Vector2(Math::range_lerp(point.x, min_p.x, max_p.x, real_t(0.0), real_t(1.0)), Math::range_lerp(point.y, -max_p.y, -min_p.y, real_t(1.0), real_t(0.0)));
+								uvs_ptr[p_idx] = Vector2(Math::remap(point.x, min_p.x, max_p.x, real_t(0.0), real_t(1.0)), Math::remap(point.y, -max_p.y, -min_p.y, real_t(1.0), real_t(0.0)));
 							}
 							tangents_ptr[p_idx * 4 + 0] = 1.0;
 							tangents_ptr[p_idx * 4 + 1] = 0.0;
@@ -2679,7 +2680,7 @@ void TextMesh::_create_mesh_array(Array &p_arr) const {
 								Vector3 point = Vector3(ts_ptr[k + l].x + offset.x, -ts_ptr[k + l].y + offset.y, -depth / 2.0);
 								vertices_ptr[p_idx] = point;
 								normals_ptr[p_idx] = Vector3(0.0, 0.0, -1.0);
-								uvs_ptr[p_idx] = Vector2(Math::range_lerp(point.x, min_p.x, max_p.x, real_t(0.0), real_t(1.0)), Math::range_lerp(point.y, -max_p.y, -min_p.y, real_t(0.8), real_t(0.4)));
+								uvs_ptr[p_idx] = Vector2(Math::remap(point.x, min_p.x, max_p.x, real_t(0.0), real_t(1.0)), Math::remap(point.y, -max_p.y, -min_p.y, real_t(0.8), real_t(0.4)));
 								tangents_ptr[p_idx * 4 + 0] = -1.0;
 								tangents_ptr[p_idx * 4 + 1] = 0.0;
 								tangents_ptr[p_idx * 4 + 2] = 0.0;
@@ -2720,9 +2721,9 @@ void TextMesh::_create_mesh_array(Array &p_arr) const {
 									vertices_ptr[p_idx + m] = quad_faces[m];
 									normals_ptr[p_idx + m] = Vector3(d.y, d.x, 0.0);
 									if (m < 2) {
-										uvs_ptr[p_idx + m] = Vector2(Math::range_lerp(u_pos, 0, ps_info.length, real_t(0.0), real_t(1.0)), (ps_info.ccw) ? 0.8 : 0.9);
+										uvs_ptr[p_idx + m] = Vector2(Math::remap(u_pos, 0, ps_info.length, real_t(0.0), real_t(1.0)), (ps_info.ccw) ? 0.8 : 0.9);
 									} else {
-										uvs_ptr[p_idx + m] = Vector2(Math::range_lerp(u_pos, 0, ps_info.length, real_t(0.0), real_t(1.0)), (ps_info.ccw) ? 0.9 : 1.0);
+										uvs_ptr[p_idx + m] = Vector2(Math::remap(u_pos, 0, ps_info.length, real_t(0.0), real_t(1.0)), (ps_info.ccw) ? 0.9 : 1.0);
 									}
 									tangents_ptr[(p_idx + m) * 4 + 0] = d.x;
 									tangents_ptr[(p_idx + m) * 4 + 1] = -d.y;
@@ -2759,9 +2760,9 @@ void TextMesh::_create_mesh_array(Array &p_arr) const {
 						vertices_ptr[p_idx + k] = quad_faces[k];
 						normals_ptr[p_idx + k] = Vector3(0.0, 0.0, 1.0);
 						if (has_depth) {
-							uvs_ptr[p_idx + k] = Vector2(Math::range_lerp(quad_faces[k].x, min_p.x, max_p.x, real_t(0.0), real_t(1.0)), Math::range_lerp(quad_faces[k].y, -max_p.y, -min_p.y, real_t(0.4), real_t(0.0)));
+							uvs_ptr[p_idx + k] = Vector2(Math::remap(quad_faces[k].x, min_p.x, max_p.x, real_t(0.0), real_t(1.0)), Math::remap(quad_faces[k].y, -max_p.y, -min_p.y, real_t(0.4), real_t(0.0)));
 						} else {
-							uvs_ptr[p_idx + k] = Vector2(Math::range_lerp(quad_faces[k].x, min_p.x, max_p.x, real_t(0.0), real_t(1.0)), Math::range_lerp(quad_faces[k].y, -max_p.y, -min_p.y, real_t(1.0), real_t(0.0)));
+							uvs_ptr[p_idx + k] = Vector2(Math::remap(quad_faces[k].x, min_p.x, max_p.x, real_t(0.0), real_t(1.0)), Math::remap(quad_faces[k].y, -max_p.y, -min_p.y, real_t(1.0), real_t(0.0)));
 						}
 						tangents_ptr[(p_idx + k) * 4 + 0] = 1.0;
 						tangents_ptr[(p_idx + k) * 4 + 1] = 0.0;
@@ -2984,13 +2985,13 @@ Ref<Font> TextMesh::_get_font_or_default() const {
 	}
 
 	// Check the project-defined Theme resource.
-	if (Theme::get_project_default().is_valid()) {
+	if (ThemeDB::get_singleton()->get_project_theme().is_valid()) {
 		List<StringName> theme_types;
-		Theme::get_project_default()->get_type_dependencies(get_class_name(), StringName(), &theme_types);
+		ThemeDB::get_singleton()->get_project_theme()->get_type_dependencies(get_class_name(), StringName(), &theme_types);
 
 		for (const StringName &E : theme_types) {
-			if (Theme::get_project_default()->has_theme_item(Theme::DATA_TYPE_FONT, "font", E)) {
-				return Theme::get_project_default()->get_theme_item(Theme::DATA_TYPE_FONT, "font", E);
+			if (ThemeDB::get_singleton()->get_project_theme()->has_theme_item(Theme::DATA_TYPE_FONT, "font", E)) {
+				return ThemeDB::get_singleton()->get_project_theme()->get_theme_item(Theme::DATA_TYPE_FONT, "font", E);
 			}
 		}
 	}
@@ -2998,17 +2999,17 @@ Ref<Font> TextMesh::_get_font_or_default() const {
 	// Lastly, fall back on the items defined in the default Theme, if they exist.
 	{
 		List<StringName> theme_types;
-		Theme::get_default()->get_type_dependencies(get_class_name(), StringName(), &theme_types);
+		ThemeDB::get_singleton()->get_default_theme()->get_type_dependencies(get_class_name(), StringName(), &theme_types);
 
 		for (const StringName &E : theme_types) {
-			if (Theme::get_default()->has_theme_item(Theme::DATA_TYPE_FONT, "font", E)) {
-				return Theme::get_default()->get_theme_item(Theme::DATA_TYPE_FONT, "font", E);
+			if (ThemeDB::get_singleton()->get_default_theme()->has_theme_item(Theme::DATA_TYPE_FONT, "font", E)) {
+				return ThemeDB::get_singleton()->get_default_theme()->get_theme_item(Theme::DATA_TYPE_FONT, "font", E);
 			}
 		}
 	}
 
 	// If they don't exist, use any type to return the default/empty value.
-	return Theme::get_default()->get_theme_item(Theme::DATA_TYPE_FONT, "font", StringName());
+	return ThemeDB::get_singleton()->get_default_theme()->get_theme_item(Theme::DATA_TYPE_FONT, "font", StringName());
 }
 
 void TextMesh::set_font_size(int p_size) {

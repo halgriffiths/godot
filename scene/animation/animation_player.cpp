@@ -323,7 +323,7 @@ void AnimationPlayer::_ensure_node_caches(AnimationData *p_anim, Node *p_root_ov
 #endif // _3D_DISABLED
 
 		if (!child->is_connected("tree_exiting", callable_mp(this, &AnimationPlayer::_node_removed))) {
-			child->connect("tree_exiting", callable_mp(this, &AnimationPlayer::_node_removed).bind(child), CONNECT_ONESHOT);
+			child->connect("tree_exiting", callable_mp(this, &AnimationPlayer::_node_removed).bind(child), CONNECT_ONE_SHOT);
 		}
 
 		TrackNodeCacheKey key;
@@ -1501,7 +1501,7 @@ bool AnimationPlayer::has_animation(const StringName &p_name) const {
 }
 
 Ref<Animation> AnimationPlayer::get_animation(const StringName &p_name) const {
-	ERR_FAIL_COND_V_MSG(!animation_set.has(p_name), Ref<Animation>(), vformat("Animation not found: %s.", p_name));
+	ERR_FAIL_COND_V_MSG(!animation_set.has(p_name), Ref<Animation>(), vformat("Animation not found: \"%s\".", p_name));
 
 	const AnimationData &data = animation_set[p_name];
 

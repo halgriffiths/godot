@@ -2714,15 +2714,15 @@ TEST_CASE("[SceneTree][TextEdit] caret") {
 	text_edit->set_caret_blink_enabled(true);
 	CHECK(text_edit->is_caret_blink_enabled());
 
-	text_edit->set_caret_blink_speed(10);
-	CHECK(text_edit->get_caret_blink_speed() == 10);
+	text_edit->set_caret_blink_interval(10);
+	CHECK(text_edit->get_caret_blink_interval() == 10);
 
 	ERR_PRINT_OFF;
-	text_edit->set_caret_blink_speed(-1);
-	CHECK(text_edit->get_caret_blink_speed() == 10);
+	text_edit->set_caret_blink_interval(-1);
+	CHECK(text_edit->get_caret_blink_interval() == 10);
 
-	text_edit->set_caret_blink_speed(0);
-	CHECK(text_edit->get_caret_blink_speed() == 10);
+	text_edit->set_caret_blink_interval(0);
+	CHECK(text_edit->get_caret_blink_interval() == 10);
 	ERR_PRINT_ON;
 
 	text_edit->set_caret_type(TextEdit::CaretType::CARET_TYPE_LINE);
@@ -3388,6 +3388,8 @@ TEST_CASE("[SceneTree][TextEdit] gutters") {
 	SUBCASE("[TextEdit] gutter add and remove") {
 		text_edit->add_gutter();
 		CHECK(text_edit->get_gutter_count() == 1);
+		CHECK(text_edit->get_gutter_width(0) == 24);
+		CHECK(text_edit->get_total_gutter_width() == 24 + 2);
 		SIGNAL_CHECK("gutter_added", empty_signal_args);
 
 		text_edit->set_gutter_name(0, "test_gutter");
@@ -3395,39 +3397,43 @@ TEST_CASE("[SceneTree][TextEdit] gutters") {
 
 		text_edit->set_gutter_width(0, 10);
 		CHECK(text_edit->get_gutter_width(0) == 10);
-		CHECK(text_edit->get_total_gutter_width() > 10);
-		CHECK(text_edit->get_total_gutter_width() < 20);
+		CHECK(text_edit->get_total_gutter_width() == 10 + 2);
 
 		text_edit->add_gutter(-100);
 		text_edit->set_gutter_width(1, 10);
-		CHECK(text_edit->get_total_gutter_width() > 20);
-		CHECK(text_edit->get_total_gutter_width() < 30);
+		CHECK(text_edit->get_gutter_width(1) == 10);
+		CHECK(text_edit->get_total_gutter_width() == 20 + 2);
 		CHECK(text_edit->get_gutter_count() == 2);
 		CHECK(text_edit->get_gutter_name(0) == "test_gutter");
 		SIGNAL_CHECK("gutter_added", empty_signal_args);
 
 		text_edit->set_gutter_draw(1, false);
-		CHECK(text_edit->get_total_gutter_width() > 10);
-		CHECK(text_edit->get_total_gutter_width() < 20);
+		CHECK(text_edit->get_total_gutter_width() == 10 + 2);
 
 		text_edit->add_gutter(100);
 		CHECK(text_edit->get_gutter_count() == 3);
+		CHECK(text_edit->get_gutter_width(2) == 24);
+		CHECK(text_edit->get_total_gutter_width() == 34 + 2);
 		CHECK(text_edit->get_gutter_name(0) == "test_gutter");
 		SIGNAL_CHECK("gutter_added", empty_signal_args);
 
 		text_edit->add_gutter(0);
 		CHECK(text_edit->get_gutter_count() == 4);
+		CHECK(text_edit->get_gutter_width(0) == 24);
+		CHECK(text_edit->get_total_gutter_width() == 58 + 2);
 		CHECK(text_edit->get_gutter_name(1) == "test_gutter");
 		SIGNAL_CHECK("gutter_added", empty_signal_args);
 
 		text_edit->remove_gutter(2);
 		CHECK(text_edit->get_gutter_name(1) == "test_gutter");
 		CHECK(text_edit->get_gutter_count() == 3);
+		CHECK(text_edit->get_total_gutter_width() == 58 + 2);
 		SIGNAL_CHECK("gutter_removed", empty_signal_args);
 
 		text_edit->remove_gutter(0);
 		CHECK(text_edit->get_gutter_name(0) == "test_gutter");
 		CHECK(text_edit->get_gutter_count() == 2);
+		CHECK(text_edit->get_total_gutter_width() == 34 + 2);
 		SIGNAL_CHECK("gutter_removed", empty_signal_args);
 
 		ERR_PRINT_OFF;

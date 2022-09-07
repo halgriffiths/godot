@@ -183,7 +183,7 @@ void RasterizerCanvasGLES3::canvas_render_items(RID p_to_render_target, Item *p_
 		glBindBufferBase(GL_UNIFORM_BUFFER, BASE_UNIFORM_LOCATION, state.canvas_state_buffer);
 		glBufferData(GL_UNIFORM_BUFFER, sizeof(StateBuffer), &state_buffer, GL_STREAM_DRAW);
 
-		GLuint global_buffer = material_storage->global_shader_uniforms_get_uniform_buffer();
+		GLuint global_buffer = material_storage->global_shader_parameters_get_uniform_buffer();
 
 		glBindBufferBase(GL_UNIFORM_BUFFER, GLOBAL_UNIFORM_LOCATION, global_buffer);
 		glBindBuffer(GL_UNIFORM_BUFFER, 0);
@@ -1022,9 +1022,9 @@ void RasterizerCanvasGLES3::_bind_instance_data_buffer(uint32_t p_max_index) {
 	}
 
 	glBindBufferBase(GL_UNIFORM_BUFFER, INSTANCE_UNIFORM_LOCATION, state.canvas_instance_data_buffers[state.current_buffer]);
-#ifdef JAVASCRIPT_ENABLED
-	//WebGL 2.0 does not support mapping buffers, so use slow glBufferData instead
-	glBufferData(GL_UNIFORM_BUFFER, sizeof(InstanceData) * p_max_index, state.instance_data_array, GL_DYNAMIC_DRAW);
+#ifdef WEB_ENABLED
+	//WebGL 2.0 does not support mapping buffers, so use slow glBufferSubData instead
+	glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(InstanceData) * p_max_index, state.instance_data_array);
 #else
 	void *ubo = glMapBufferRange(GL_UNIFORM_BUFFER, 0, sizeof(InstanceData) * p_max_index, GL_MAP_WRITE_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
 	memcpy(ubo, state.instance_data_array, sizeof(InstanceData) * p_max_index);

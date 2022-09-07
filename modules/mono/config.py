@@ -1,26 +1,16 @@
-# Prior to .NET Core, we supported these: ["windows", "macos", "linuxbsd", "android", "haiku", "javascript", "ios"]
+# Prior to .NET Core, we supported these: ["windows", "macos", "linuxbsd", "android", "haiku", "web", "ios"]
 # Eventually support for each them should be added back (except Haiku if not supported by .NET Core)
 supported_platforms = ["windows", "macos", "linuxbsd"]
 
 
 def can_build(env, platform):
-    return not env["arch"].startswith("rv")
+    if env["arch"].startswith("rv"):
+        return False
 
+    if env["tools"]:
+        env.module_add_dependencies("mono", ["regex"])
 
-def get_opts(platform):
-    from SCons.Variables import BoolVariable, PathVariable
-
-    default_mono_static = platform in ["ios", "javascript"]
-    default_mono_bundles_zlib = platform in ["javascript"]
-
-    return [
-        PathVariable(
-            "dotnet_root",
-            "Path to the .NET Sdk installation directory for the target platform and architecture",
-            "",
-            PathVariable.PathAccept,
-        ),
-    ]
+    return True
 
 
 def configure(env):

@@ -474,7 +474,7 @@ void DynamicFontImportSettings::_main_prop_changed(const String &p_edited_proper
 
 	font_preview_label->add_theme_font_override("font", font_preview);
 	font_preview_label->add_theme_font_size_override("font_size", 200 * EDSCALE);
-	font_preview_label->update();
+	font_preview_label->queue_redraw();
 }
 
 /*************************************************************************/
@@ -1096,7 +1096,7 @@ void DynamicFontImportSettings::open_settings(const String &p_path) {
 	}
 	font_preview_label->add_theme_font_override("font", font_preview);
 	font_preview_label->add_theme_font_size_override("font_size", 200 * EDSCALE);
-	font_preview_label->update();
+	font_preview_label->queue_redraw();
 
 	_variations_validate();
 
@@ -1239,7 +1239,7 @@ DynamicFontImportSettings::DynamicFontImportSettings() {
 
 	add_var = memnew(Button);
 	page2_hb_vars->add_child(add_var);
-	add_var->set_tooltip(TTR("Add configuration"));
+	add_var->set_tooltip_text(TTR("Add configuration"));
 	add_var->set_icon(add_var->get_theme_icon(SNAME("Add"), SNAME("EditorIcons")));
 	add_var->connect("pressed", callable_mp(this, &DynamicFontImportSettings::_variation_add));
 
@@ -1343,8 +1343,8 @@ DynamicFontImportSettings::DynamicFontImportSettings() {
 	for (int i = 0; i < 16; i++) {
 		glyph_table->set_column_title(i + 1, String::num_int64(i, 16));
 	}
-	glyph_table->add_theme_style_override("selected", glyph_table->get_theme_stylebox(SNAME("bg")));
-	glyph_table->add_theme_style_override("selected_focus", glyph_table->get_theme_stylebox(SNAME("bg")));
+	glyph_table->add_theme_style_override("selected", glyph_table->get_theme_stylebox(SNAME("panel")));
+	glyph_table->add_theme_style_override("selected_focus", glyph_table->get_theme_stylebox(SNAME("panel")));
 	glyph_table->add_theme_constant_override("h_separation", 0);
 	glyph_table->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	glyph_table->set_v_size_flags(Control::SIZE_EXPAND_FILL);

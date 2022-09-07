@@ -313,7 +313,7 @@ void CreateDialog::_configure_search_option_item(TreeItem *r_item, const String 
 	}
 
 	const String &description = DTR(EditorHelp::get_doc_data()->class_list[p_type].brief_description);
-	r_item->set_tooltip(0, description);
+	r_item->set_tooltip_text(0, description);
 
 	if (p_type_category == TypeCategory::OTHER_TYPE && !script_type) {
 		Ref<Texture2D> icon = EditorNode::get_editor_data().get_custom_types()[custom_type_parents[p_type]][custom_type_indices[p_type]].icon;
@@ -383,7 +383,7 @@ void CreateDialog::_confirmed() {
 	}
 
 	{
-		Ref<FileAccess> f = FileAccess::open(EditorPaths::get_singleton()->get_project_settings_dir().plus_file("create_recent." + base_type), FileAccess::WRITE);
+		Ref<FileAccess> f = FileAccess::open(EditorPaths::get_singleton()->get_project_settings_dir().path_join("create_recent." + base_type), FileAccess::WRITE);
 		if (f.is_valid()) {
 			f->store_line(selected_item);
 
@@ -660,12 +660,12 @@ void CreateDialog::_save_and_update_favorite_list() {
 	TreeItem *root = favorites->create_item();
 
 	{
-		Ref<FileAccess> f = FileAccess::open(EditorPaths::get_singleton()->get_project_settings_dir().plus_file("favorites." + base_type), FileAccess::WRITE);
+		Ref<FileAccess> f = FileAccess::open(EditorPaths::get_singleton()->get_project_settings_dir().path_join("favorites." + base_type), FileAccess::WRITE);
 		if (f.is_valid()) {
 			for (int i = 0; i < favorite_list.size(); i++) {
 				String l = favorite_list[i];
 				String name = l.get_slicec(' ', 0);
-				if (!(ClassDB::class_exists(name) || ScriptServer::is_global_class(name))) {
+				if (!EditorNode::get_editor_data().is_type_recognized(name)) {
 					continue;
 				}
 				f->store_line(l);
@@ -686,19 +686,19 @@ void CreateDialog::_save_and_update_favorite_list() {
 
 void CreateDialog::_load_favorites_and_history() {
 	String dir = EditorPaths::get_singleton()->get_project_settings_dir();
-	Ref<FileAccess> f = FileAccess::open(dir.plus_file("create_recent." + base_type), FileAccess::READ);
+	Ref<FileAccess> f = FileAccess::open(dir.path_join("create_recent." + base_type), FileAccess::READ);
 	if (f.is_valid()) {
 		while (!f->eof_reached()) {
 			String l = f->get_line().strip_edges();
 			String name = l.get_slicec(' ', 0);
 
-			if ((ClassDB::class_exists(name) || ScriptServer::is_global_class(name)) && !_is_class_disabled_by_feature_profile(name)) {
+			if (EditorNode::get_editor_data().is_type_recognized(name) && !_is_class_disabled_by_feature_profile(name)) {
 				recent->add_item(l, EditorNode::get_singleton()->get_class_icon(name, icon_fallback));
 			}
 		}
 	}
 
-	f = FileAccess::open(dir.plus_file("favorites." + base_type), FileAccess::READ);
+	f = FileAccess::open(dir.path_join("favorites." + base_type), FileAccess::READ);
 	if (f.is_valid()) {
 		while (!f->eof_reached()) {
 			String l = f->get_line().strip_edges();
@@ -780,7 +780,7 @@ CreateDialog::CreateDialog() {
 
 	favorite = memnew(Button);
 	favorite->set_toggle_mode(true);
-	favorite->set_tooltip(TTR("(Un)favorite selected item."));
+	favorite->set_tooltip_text(TTR("(Un)favorite selected item."));
 	favorite->connect("pressed", callable_mp(this, &CreateDialog::_favorite_toggled));
 	search_hb->add_child(favorite);
 	vbc->add_margin_child(TTR("Search:"), search_hb);
