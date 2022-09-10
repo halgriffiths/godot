@@ -515,7 +515,7 @@ void EditorProfiler::set_enabled(bool p_enable, bool p_clear) {
 	activate->set_pressed(false);
 	activate->set_disabled(!p_enable);
 	if (p_clear) {
-		_clear_pressed();
+		clear();
 	}
 }
 
