@@ -38,7 +38,7 @@
 #include "editor/editor_scale.h"
 #include "editor/editor_settings.h"
 
-void CreateDialog::popup_create(bool p_dont_clear, bool p_replace_mode, const String &p_select_type, const String &p_select_name) {
+void CreateDialog::popup_create(bool p_dont_clear, bool p_replace_mode, const String &p_current_type, const String &p_current_name) {
 	_fill_type_list();
 
 	icon_fallback = search_options->has_theme_icon(base_type, SNAME("EditorIcons")) ? base_type : "Object";
@@ -50,18 +50,14 @@ void CreateDialog::popup_create(bool p_dont_clear, bool p_replace_mode, const St
 	}
 
 	if (p_replace_mode) {
-		search_box->set_text(p_select_type);
+		search_box->set_text(p_current_type);
 	}
 
 	search_box->grab_focus();
 	_update_search();
 
 	if (p_replace_mode) {
-		if (!p_select_name.is_empty()) {
-			set_title(vformat(TTR("Convert %s from %s"), p_select_name, p_select_type));
-		} else {
-			set_title(vformat(TTR("Convert %s"), p_select_type));
-		}
+		set_title(vformat(TTR("Change Type of \"%s\""), p_current_name));
 		set_ok_button_text(TTR("Change"));
 	} else {
 		set_title(vformat(TTR("Create New %s"), base_type));
@@ -298,6 +294,15 @@ void CreateDialog::_configure_search_option_item(TreeItem *r_item, const String 
 		r_item->set_selectable(0, false);
 	} else {
 		r_item->set_icon(0, EditorNode::get_singleton()->get_class_icon(p_type, icon_fallback));
+	}
+
+	bool is_deprecated = EditorHelp::get_doc_data()->class_list[p_type].is_deprecated;
+	bool is_experimental = EditorHelp::get_doc_data()->class_list[p_type].is_experimental;
+
+	if (is_deprecated) {
+		r_item->add_button(0, get_theme_icon("StatusError", SNAME("EditorIcons")), 0, false, TTR("This class is marked as deprecated."));
+	} else if (is_experimental) {
+		r_item->add_button(0, get_theme_icon("NodeWarning", SNAME("EditorIcons")), 0, false, TTR("This class is marked as experimental."));
 	}
 
 	if (!search_box->get_text().is_empty()) {

@@ -175,7 +175,7 @@ void EditorSettingsDialog::shortcut_input(const Ref<InputEvent> &p_event) {
 			handled = true;
 		}
 
-		if (k->get_keycode_with_modifiers() == (KeyModifierMask::CMD | Key::F)) {
+		if (k->is_match(InputEventKey::create_reference(KeyModifierMask::CMD_OR_CTRL | Key::F))) {
 			_focus_current_search_box();
 			handled = true;
 		}
@@ -552,6 +552,10 @@ void EditorSettingsDialog::_shortcut_cell_double_clicked() {
 	const ShortcutButton edit_btn_id = EditorSettingsDialog::SHORTCUT_EDIT;
 	const int edit_btn_col = 1;
 	TreeItem *ti = shortcuts->get_selected();
+	if (ti == nullptr) {
+		return;
+	}
+
 	String type = ti->get_meta("type");
 	int col = shortcuts->get_selected_column();
 	if (type == "shortcut" && col == 0) {

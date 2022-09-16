@@ -348,7 +348,6 @@ public:
 
 	void move_child(Node *p_child, int p_pos);
 	void _move_child(Node *p_child, int p_pos, bool p_ignore_end = false);
-	void raise();
 
 	void set_owner(Node *p_owner);
 	Node *get_owner() const;
@@ -357,7 +356,6 @@ public:
 	void set_unique_name_in_owner(bool p_enabled);
 	bool is_unique_name_in_owner() const;
 
-	void remove_and_skip();
 	int get_index(bool p_include_internal = true) const;
 
 	Ref<Tween> create_tween();
@@ -530,5 +528,9 @@ Error Node::rpc_id(int p_peer_id, const StringName &p_method, VarArgs... p_args)
 	}
 	return rpcp(p_peer_id, p_method, sizeof...(p_args) == 0 ? nullptr : (const Variant **)argptrs, sizeof...(p_args));
 }
+
+// Add these macro to your class's 'get_configuration_warnings' function to have warnings show up in the scene tree inspector.
+#define DEPRECATED_NODE_WARNING warnings.push_back(RTR("This node is marked as deprecated and will be removed in future versions.\nPlease check the Godot documentation for information about migration."));
+#define EXPERIMENTAL_NODE_WARNING warnings.push_back(RTR("This node is marked as experimental and may be subject to removal or major changes in future versions."));
 
 #endif // NODE_H
