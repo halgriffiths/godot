@@ -133,7 +133,7 @@ void SceneCreateDialog::update_dialog() {
 		root_name = scene_name.get_file().get_basename();
 	}
 
-	if (!root_name.is_valid_identifier()) {
+	if (root_name.is_empty() || root_name.validate_node_name().size() != root_name.size()) {
 		update_error(node_error_label, MSG_ERROR, TTR("Invalid root node name."));
 		is_valid = false;
 	}
@@ -170,9 +170,9 @@ Node *SceneCreateDialog::create_scene_root() {
 			root = memnew(Node3D);
 			break;
 		case ROOT_USER_INTERFACE: {
-			Control *gui = memnew(Control);
-			gui->set_anchors_and_offsets_preset(Control::PRESET_FULL_RECT);
-			root = gui;
+			Control *gui_ctl = memnew(Control);
+			gui_ctl->set_anchors_and_offsets_preset(Control::PRESET_FULL_RECT);
+			root = gui_ctl;
 		} break;
 		case ROOT_OTHER:
 			root = Object::cast_to<Node>(select_node_dialog->instance_selected());

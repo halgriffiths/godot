@@ -34,8 +34,8 @@
 #include "core/templates/local_vector.h"
 #include "core/templates/rid_owner.h"
 #include "core/templates/self_list.h"
-#include "servers/rendering/renderer_scene.h"
 #include "servers/rendering/renderer_scene_render.h"
+#include "servers/rendering/rendering_method.h"
 #include "servers/rendering_server.h"
 #include "servers/xr/xr_interface.h"
 #include "storage/render_scene_buffers.h"
@@ -117,6 +117,8 @@ public:
 
 		bool transparent_bg = false;
 
+		uint32_t canvas_cull_mask = 0xffffffff;
+
 		struct CanvasKey {
 			int64_t stacking;
 			RID canvas;
@@ -148,7 +150,7 @@ public:
 
 		HashMap<RID, CanvasData> canvas_map;
 
-		RendererScene::RenderInfo render_info;
+		RenderingMethod::RenderInfo render_info;
 
 		Viewport() {
 			view_count = 1;
@@ -248,6 +250,8 @@ public:
 
 	void viewport_set_global_canvas_transform(RID p_viewport, const Transform2D &p_transform);
 	void viewport_set_canvas_stacking(RID p_viewport, RID p_canvas, int p_layer, int p_sublayer);
+
+	void viewport_set_canvas_cull_mask(RID p_viewport, uint32_t p_canvas_cull_mask);
 
 	void viewport_set_positional_shadow_atlas_size(RID p_viewport, int p_size, bool p_16_bits = true);
 	void viewport_set_positional_shadow_atlas_quadrant_subdivision(RID p_viewport, int p_quadrant, int p_subdiv);

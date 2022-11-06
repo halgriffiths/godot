@@ -32,8 +32,8 @@
 
 #include "core/config/project_settings.h"
 #include "core/os/os.h"
+#include "servers/rendering/rendering_server_globals.h"
 #include "servers/rendering/shader_types.h"
-#include "servers/rendering_server.h"
 
 #define SL ShaderLanguage
 
@@ -373,16 +373,16 @@ void ShaderCompiler::_dump_function_deps(const SL::ShaderNode *p_node, const Str
 static String _get_global_shader_uniform_from_type_and_index(const String &p_buffer, const String &p_index, ShaderLanguage::DataType p_type) {
 	switch (p_type) {
 		case ShaderLanguage::TYPE_BOOL: {
-			return "(" + p_buffer + "[" + p_index + "].x != 0.0)";
+			return "bool(floatBitsToUint(" + p_buffer + "[" + p_index + "].x))";
 		}
 		case ShaderLanguage::TYPE_BVEC2: {
-			return "(notEqual(" + p_buffer + "[" + p_index + "].xy, vec2(0.0)))";
+			return "bvec2(floatBitsToUint(" + p_buffer + "[" + p_index + "].xy))";
 		}
 		case ShaderLanguage::TYPE_BVEC3: {
-			return "(notEqual(" + p_buffer + "[" + p_index + "].xyz, vec3(0.0)))";
+			return "bvec3(floatBitsToUint(" + p_buffer + "[" + p_index + "].xyz))";
 		}
 		case ShaderLanguage::TYPE_BVEC4: {
-			return "(notEqual(" + p_buffer + "[" + p_index + "].xyzw, vec4(0.0)))";
+			return "bvec4(floatBitsToUint(" + p_buffer + "[" + p_index + "].xyzw))";
 		}
 		case ShaderLanguage::TYPE_INT: {
 			return "floatBitsToInt(" + p_buffer + "[" + p_index + "].x)";
@@ -1348,8 +1348,8 @@ String ShaderCompiler::_dump_node_code(const SL::Node *p_node, int p_level, Gene
 	return code;
 }
 
-ShaderLanguage::DataType ShaderCompiler::_get_variable_type(const StringName &p_type) {
-	RS::GlobalShaderParameterType gvt = RS::get_singleton()->global_shader_parameter_get_type(p_type);
+ShaderLanguage::DataType ShaderCompiler::_get_global_shader_uniform_type(const StringName &p_name) {
+	RS::GlobalShaderParameterType gvt = RSG::material_storage->global_shader_parameter_get_type(p_name);
 	return (ShaderLanguage::DataType)RS::global_shader_uniform_type_get_shader_datatype(gvt);
 }
 
@@ -1358,7 +1358,7 @@ Error ShaderCompiler::compile(RS::ShaderMode p_mode, const String &p_code, Ident
 	info.functions = ShaderTypes::get_singleton()->get_functions(p_mode);
 	info.render_modes = ShaderTypes::get_singleton()->get_modes(p_mode);
 	info.shader_types = ShaderTypes::get_singleton()->get_types();
-	info.global_shader_uniform_type_func = _get_variable_type;
+	info.global_shader_uniform_type_func = _get_global_shader_uniform_type;
 
 	Error err = parser.compile(p_code, info);
 
@@ -1369,11 +1369,11 @@ Error ShaderCompiler::compile(RS::ShaderMode p_mode, const String &p_code, Ident
 		HashMap<String, Vector<String>> includes;
 		includes[""] = Vector<String>();
 		Vector<String> include_stack;
-		Vector<String> shader = p_code.split("\n");
+		Vector<String> shader_lines = p_code.split("\n");
 
 		// Reconstruct the files.
-		for (int i = 0; i < shader.size(); i++) {
-			String l = shader[i];
+		for (int i = 0; i < shader_lines.size(); i++) {
+			String l = shader_lines[i];
 			if (l.begins_with("@@>")) {
 				String inc_path = l.replace_first("@@>", "");
 

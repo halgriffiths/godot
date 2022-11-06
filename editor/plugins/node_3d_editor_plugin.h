@@ -53,7 +53,6 @@ class Node3DEditorViewport;
 class SubViewportContainer;
 class DirectionalLight3D;
 class WorldEnvironment;
-class EditorUndoRedoManager;
 
 class ViewportRotationControl : public Control {
 	GDCLASS(ViewportRotationControl, Control);
@@ -193,6 +192,9 @@ private:
 	void _menu_option(int p_option);
 	void _set_auto_orthogonal();
 	Node3D *preview_node = nullptr;
+	bool update_preview_node = false;
+	Point2 preview_node_viewport_pos;
+	Vector3 preview_node_pos;
 	AABB *preview_bounds = nullptr;
 	Vector<String> selected_files;
 	AcceptDialog *accept = nullptr;
@@ -200,9 +202,7 @@ private:
 	Node *target_node = nullptr;
 	Point2 drop_pos;
 
-	EditorData *editor_data = nullptr;
 	EditorSelection *editor_selection = nullptr;
-	Ref<EditorUndoRedoManager> undo_redo;
 
 	CheckBox *preview_camera = nullptr;
 	SubViewportContainer *subviewport_container = nullptr;
@@ -413,7 +413,7 @@ private:
 	bool _create_instance(Node *parent, String &path, const Point2 &p_point);
 	void _perform_drop_data();
 
-	bool can_drop_data_fw(const Point2 &p_point, const Variant &p_data, Control *p_from) const;
+	bool can_drop_data_fw(const Point2 &p_point, const Variant &p_data, Control *p_from);
 	void drop_data_fw(const Point2 &p_point, const Variant &p_data, Control *p_from);
 
 	void _project_settings_changed();
@@ -683,7 +683,6 @@ private:
 	HBoxContainer *context_menu_hbox = nullptr;
 
 	void _generate_selection_boxes();
-	Ref<EditorUndoRedoManager> undo_redo;
 
 	int camera_override_viewport_id;
 
@@ -719,6 +718,9 @@ private:
 
 	void _selection_changed();
 	void _refresh_menu_icons();
+
+	bool do_snap_selected_nodes_to_floor = false;
+	void _snap_selected_nodes_to_floor();
 
 	// Preview Sun and Environment
 
@@ -767,7 +769,7 @@ private:
 	WorldEnvironment *preview_environment = nullptr;
 	bool preview_env_dangling = false;
 	Ref<Environment> environment;
-	Ref<CameraAttributesPhysical> camera_attributes;
+	Ref<CameraAttributesPractical> camera_attributes;
 	Ref<ProceduralSkyMaterial> sky_material;
 
 	bool sun_environ_updating = false;
@@ -828,9 +830,6 @@ public:
 	void set_state(const Dictionary &p_state);
 
 	Ref<Environment> get_viewport_environment() { return viewport_environment; }
-
-	void set_undo_redo(Ref<EditorUndoRedoManager> p_undo_redo);
-	Ref<EditorUndoRedoManager> get_undo_redo();
 
 	void add_control_to_menu_panel(Control *p_control);
 	void remove_control_from_menu_panel(Control *p_control);

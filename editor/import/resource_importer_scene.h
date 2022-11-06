@@ -35,11 +35,13 @@
 #include "core/io/resource_importer.h"
 #include "core/variant/dictionary.h"
 #include "scene/3d/importer_mesh_instance_3d.h"
-#include "scene/3d/node_3d.h"
 #include "scene/resources/animation.h"
+#include "scene/resources/box_shape_3d.h"
+#include "scene/resources/capsule_shape_3d.h"
+#include "scene/resources/cylinder_shape_3d.h"
 #include "scene/resources/mesh.h"
 #include "scene/resources/shape_3d.h"
-#include "scene/resources/skin.h"
+#include "scene/resources/sphere_shape_3d.h"
 
 class Material;
 class AnimationPlayer;
@@ -281,7 +283,7 @@ public:
 	Node *_post_fix_animations(Node *p_node, Node *p_root, const Dictionary &p_node_data, const Dictionary &p_animation_data, float p_animation_fps);
 
 	Ref<Animation> _save_animation_to_file(Ref<Animation> anim, bool p_save_to_file, String p_save_to_path, bool p_keep_custom_tracks);
-	void _create_clips(AnimationPlayer *anim, const Array &p_clips, bool p_bake_all);
+	void _create_slices(AnimationPlayer *ap, Ref<Animation> anim, const Array &p_clips, bool p_bake_all);
 	void _optimize_animations(AnimationPlayer *anim, float p_max_vel_error, float p_max_ang_error, int p_prc_error);
 	void _compress_animations(AnimationPlayer *anim, int p_page_size_kb);
 
@@ -310,11 +312,6 @@ public:
 	virtual void get_extensions(List<String> *r_extensions) const override;
 	virtual Node *import_scene(const String &p_path, uint32_t p_flags, const HashMap<StringName, Variant> &p_options, int p_bake_fps, List<String> *r_missing_deps, Error *r_err = nullptr) override;
 };
-
-#include "scene/resources/box_shape_3d.h"
-#include "scene/resources/capsule_shape_3d.h"
-#include "scene/resources/cylinder_shape_3d.h"
-#include "scene/resources/sphere_shape_3d.h"
 
 template <class M>
 Vector<Ref<Shape3D>> ResourceImporterScene::get_collision_shapes(const Ref<Mesh> &p_mesh, const M &p_options) {
@@ -477,7 +474,7 @@ Transform3D ResourceImporterScene::get_collision_shapes_transform(const M &p_opt
 		}
 
 		if (p_options.has(SNAME("primitive/rotation"))) {
-			transform.basis.set_euler((p_options[SNAME("primitive/rotation")].operator Vector3() / 180.0) * Math_PI);
+			transform.basis = Basis::from_euler(p_options[SNAME("primitive/rotation")].operator Vector3() * (Math_PI / 180.0));
 		}
 	}
 	return transform;

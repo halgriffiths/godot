@@ -2932,11 +2932,16 @@ GDScriptParser::ExpressionNode *GDScriptParser::parse_call(ExpressionNode *p_pre
 			// Allow for trailing comma.
 			break;
 		}
+		bool use_identifier_completion = current.cursor_place == GDScriptTokenizer::CURSOR_END || current.cursor_place == GDScriptTokenizer::CURSOR_MIDDLE;
 		ExpressionNode *argument = parse_expression(false);
 		if (argument == nullptr) {
 			push_error(R"(Expected expression as the function argument.)");
 		} else {
 			call->arguments.push_back(argument);
+
+			if (argument->type == Node::IDENTIFIER && use_identifier_completion) {
+				completion_context.type = COMPLETION_IDENTIFIER;
+			}
 		}
 		ct = COMPLETION_CALL_ARGUMENTS;
 	} while (match(GDScriptTokenizer::Token::COMMA));
@@ -3758,6 +3763,39 @@ bool GDScriptParser::export_annotations(const AnnotationNode *p_annotation, Node
 					return false;
 				}
 				break;
+			case GDScriptParser::DataType::CLASS:
+				// Can assume type is a global GDScript class.
+				if (ClassDB::is_parent_class(export_type.native_type, SNAME("Resource"))) {
+					variable->export_info.type = Variant::OBJECT;
+					variable->export_info.hint = PROPERTY_HINT_RESOURCE_TYPE;
+					variable->export_info.hint_string = export_type.class_type->identifier->name;
+				} else if (ClassDB::is_parent_class(export_type.native_type, SNAME("Node"))) {
+					variable->export_info.type = Variant::OBJECT;
+					variable->export_info.hint = PROPERTY_HINT_NODE_TYPE;
+					variable->export_info.hint_string = export_type.class_type->identifier->name;
+				} else {
+					push_error(R"(Export type can only be built-in, a resource, a node or an enum.)", variable);
+					return false;
+				}
+
+				break;
+			case GDScriptParser::DataType::SCRIPT: {
+				StringName class_name;
+				if (export_type.script_type != nullptr && export_type.script_type.is_valid()) {
+					class_name = export_type.script_type->get_language()->get_global_class_name(export_type.script_type->get_path());
+				}
+				if (class_name == StringName()) {
+					Ref<Script> script = ResourceLoader::load(export_type.script_path, SNAME("Script"));
+					if (script.is_valid()) {
+						class_name = script->get_language()->get_global_class_name(export_type.script_path);
+					}
+				}
+				if (class_name != StringName() && ClassDB::is_parent_class(ScriptServer::get_global_class_native_base(class_name), SNAME("Resource"))) {
+					variable->export_info.type = Variant::OBJECT;
+					variable->export_info.hint = PROPERTY_HINT_RESOURCE_TYPE;
+					variable->export_info.hint_string = class_name;
+				}
+			} break;
 			case GDScriptParser::DataType::ENUM: {
 				variable->export_info.type = Variant::INT;
 				variable->export_info.hint = PROPERTY_HINT_ENUM;
@@ -3921,28 +3959,22 @@ GDScriptParser::DataType GDScriptParser::SuiteNode::Local::get_datatype() const 
 }
 
 String GDScriptParser::SuiteNode::Local::get_name() const {
-	String name;
 	switch (type) {
 		case SuiteNode::Local::PARAMETER:
-			name = "parameter";
-			break;
+			return "parameter";
 		case SuiteNode::Local::CONSTANT:
-			name = "constant";
-			break;
+			return "constant";
 		case SuiteNode::Local::VARIABLE:
-			name = "variable";
-			break;
+			return "variable";
 		case SuiteNode::Local::FOR_VARIABLE:
-			name = "for loop iterator";
-			break;
+			return "for loop iterator";
 		case SuiteNode::Local::PATTERN_BIND:
-			name = "pattern_bind";
-			break;
+			return "pattern_bind";
 		case SuiteNode::Local::UNDEFINED:
-			name = "<undefined>";
-			break;
+			return "<undefined>";
+		default:
+			return String();
 	}
-	return name;
 }
 
 String GDScriptParser::DataType::to_string() const {
@@ -3974,7 +4006,7 @@ String GDScriptParser::DataType::to_string() const {
 			if (is_meta_type) {
 				return script_type->get_class_name().operator String();
 			}
-			String name = script_type->get_name();
+			String name = script_type != nullptr ? script_type->get_name() : "";
 			if (!name.is_empty()) {
 				return name;
 			}

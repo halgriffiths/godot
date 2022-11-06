@@ -332,8 +332,11 @@ public:
 	virtual Variant area_get_param(RID p_parea, AreaParameter p_param) const = 0;
 	virtual Transform2D area_get_transform(RID p_area) const = 0;
 
-	virtual void area_set_collision_mask(RID p_area, uint32_t p_mask) = 0;
 	virtual void area_set_collision_layer(RID p_area, uint32_t p_layer) = 0;
+	virtual uint32_t area_get_collision_layer(RID p_area) const = 0;
+
+	virtual void area_set_collision_mask(RID p_area, uint32_t p_mask) = 0;
+	virtual uint32_t area_get_collision_mask(RID p_area) const = 0;
 
 	virtual void area_set_monitorable(RID p_area, bool p_monitorable) = 0;
 	virtual void area_set_pickable(RID p_area, bool p_pickable) = 0;
@@ -470,10 +473,7 @@ public:
 	virtual void body_set_omit_force_integration(RID p_body, bool p_omit) = 0;
 	virtual bool body_is_omitting_force_integration(RID p_body) const = 0;
 
-	// Callback for C++ use only.
-	typedef void (*BodyStateCallback)(void *p_instance, PhysicsDirectBodyState2D *p_state);
-	virtual void body_set_state_sync_callback(RID p_body, void *p_instance, BodyStateCallback p_callback) = 0;
-
+	virtual void body_set_state_sync_callback(RID p_body, const Callable &p_callable) = 0;
 	virtual void body_set_force_integration_callback(RID p_body, const Callable &p_callable, const Variant &p_udata = Variant()) = 0;
 
 	virtual bool body_collide_shape(RID p_body, int p_body_shape, RID p_shape, const Transform2D &p_shape_xform, const Vector2 &p_motion, Vector2 *r_results, int p_result_max, int &r_result_count) = 0;

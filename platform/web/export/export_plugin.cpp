@@ -307,13 +307,7 @@ void EditorExportPlatformWeb::get_preset_features(const Ref<EditorExportPreset> 
 	}
 
 	if (p_preset->get("vram_texture_compression/for_mobile")) {
-		String driver = ProjectSettings::get_singleton()->get("rendering/driver/driver_name");
-		if (driver == "opengl3") {
-			r_features->push_back("etc");
-		} else if (driver == "vulkan") {
-			// FIXME: Review if this is correct.
-			r_features->push_back("etc2");
-		}
+		r_features->push_back("etc2");
 	}
 	r_features->push_back("wasm32");
 }
@@ -491,6 +485,7 @@ Error EditorExportPlatformWeb::export_project(const Ref<EditorExportPreset> &p_p
 	}
 	html.resize(f->get_length());
 	f->get_buffer(html.ptrw(), html.size());
+	f.unref(); // close file.
 
 	// Generate HTML file with replaced strings.
 	_fix_html(html, p_preset, base_name, p_debug, p_flags, shared_objects, file_sizes);

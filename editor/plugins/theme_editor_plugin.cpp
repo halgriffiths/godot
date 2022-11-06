@@ -134,7 +134,7 @@ void ThemeItemImportTree::_update_items_tree() {
 			data_type_node->set_checked(IMPORT_ITEM_DATA, false);
 			data_type_node->set_editable(IMPORT_ITEM_DATA, true);
 
-			List<TreeItem *> *item_list;
+			List<TreeItem *> *item_list = nullptr;
 
 			switch (dt) {
 				case Theme::DATA_TYPE_COLOR:
@@ -398,7 +398,7 @@ void ThemeItemImportTree::_restore_selected_item(TreeItem *p_tree_item) {
 void ThemeItemImportTree::_update_total_selected(Theme::DataType p_data_type) {
 	ERR_FAIL_INDEX_MSG(p_data_type, Theme::DATA_TYPE_MAX, "Theme item data type is out of bounds.");
 
-	Label *total_selected_items_label;
+	Label *total_selected_items_label = nullptr;
 	switch (p_data_type) {
 		case Theme::DATA_TYPE_COLOR:
 			total_selected_items_label = total_selected_colors_label;
@@ -562,7 +562,7 @@ void ThemeItemImportTree::_select_all_data_type_pressed(int p_data_type) {
 	}
 
 	Theme::DataType data_type = (Theme::DataType)p_data_type;
-	List<TreeItem *> *item_list;
+	List<TreeItem *> *item_list = nullptr;
 
 	switch (data_type) {
 		case Theme::DATA_TYPE_COLOR:
@@ -617,7 +617,7 @@ void ThemeItemImportTree::_select_full_data_type_pressed(int p_data_type) {
 	}
 
 	Theme::DataType data_type = (Theme::DataType)p_data_type;
-	List<TreeItem *> *item_list;
+	List<TreeItem *> *item_list = nullptr;
 
 	switch (data_type) {
 		case Theme::DATA_TYPE_COLOR:
@@ -674,7 +674,7 @@ void ThemeItemImportTree::_deselect_all_data_type_pressed(int p_data_type) {
 	}
 
 	Theme::DataType data_type = (Theme::DataType)p_data_type;
-	List<TreeItem *> *item_list;
+	List<TreeItem *> *item_list = nullptr;
 
 	switch (data_type) {
 		case Theme::DATA_TYPE_COLOR:
@@ -982,17 +982,17 @@ ThemeItemImportTree::ThemeItemImportTree() {
 	for (int i = 0; i < Theme::DATA_TYPE_MAX; i++) {
 		Theme::DataType dt = (Theme::DataType)i;
 
-		TextureRect *select_items_icon;
-		Label *select_items_label;
-		Button *deselect_all_items_button;
-		Button *select_all_items_button;
-		Button *select_full_items_button;
-		Label *total_selected_items_label;
+		TextureRect *select_items_icon = nullptr;
+		Label *select_items_label = nullptr;
+		Button *deselect_all_items_button = nullptr;
+		Button *select_all_items_button = nullptr;
+		Button *select_full_items_button = nullptr;
+		Label *total_selected_items_label = nullptr;
 
-		String items_title = "";
-		String select_all_items_tooltip = "";
-		String select_full_items_tooltip = "";
-		String deselect_all_items_tooltip = "";
+		String items_title;
+		String select_all_items_tooltip;
+		String select_full_items_tooltip;
+		String deselect_all_items_tooltip;
 
 		switch (dt) {
 			case Theme::DATA_TYPE_COLOR:
@@ -2481,7 +2481,7 @@ void ThemeTypeEditor::_update_type_items() {
 	{
 		for (int i = color_items_list->get_child_count() - 1; i >= 0; i--) {
 			Node *node = color_items_list->get_child(i);
-			node->queue_delete();
+			node->queue_free();
 			color_items_list->remove_child(node);
 		}
 
@@ -2510,7 +2510,7 @@ void ThemeTypeEditor::_update_type_items() {
 	{
 		for (int i = constant_items_list->get_child_count() - 1; i >= 0; i--) {
 			Node *node = constant_items_list->get_child(i);
-			node->queue_delete();
+			node->queue_free();
 			constant_items_list->remove_child(node);
 		}
 
@@ -2543,7 +2543,7 @@ void ThemeTypeEditor::_update_type_items() {
 	{
 		for (int i = font_items_list->get_child_count() - 1; i >= 0; i--) {
 			Node *node = font_items_list->get_child(i);
-			node->queue_delete();
+			node->queue_free();
 			font_items_list->remove_child(node);
 		}
 
@@ -2581,7 +2581,7 @@ void ThemeTypeEditor::_update_type_items() {
 	{
 		for (int i = font_size_items_list->get_child_count() - 1; i >= 0; i--) {
 			Node *node = font_size_items_list->get_child(i);
-			node->queue_delete();
+			node->queue_free();
 			font_size_items_list->remove_child(node);
 		}
 
@@ -2614,7 +2614,7 @@ void ThemeTypeEditor::_update_type_items() {
 	{
 		for (int i = icon_items_list->get_child_count() - 1; i >= 0; i--) {
 			Node *node = icon_items_list->get_child(i);
-			node->queue_delete();
+			node->queue_free();
 			icon_items_list->remove_child(node);
 		}
 
@@ -2652,7 +2652,7 @@ void ThemeTypeEditor::_update_type_items() {
 	{
 		for (int i = stylebox_items_list->get_child_count() - 1; i >= 0; i--) {
 			Node *node = stylebox_items_list->get_child(i);
-			node->queue_delete();
+			node->queue_free();
 			stylebox_items_list->remove_child(node);
 		}
 

@@ -50,7 +50,7 @@ class TypedArray;
 
 enum PropertyHint {
 	PROPERTY_HINT_NONE, ///< no hint provided.
-	PROPERTY_HINT_RANGE, ///< hint_text = "min,max[,step][,or_greater][,or_less][,no_slider][,radians][,degrees][,exp][,suffix:<keyword>] range.
+	PROPERTY_HINT_RANGE, ///< hint_text = "min,max[,step][,or_greater][,or_less][,hide_slider][,radians][,degrees][,exp][,suffix:<keyword>] range.
 	PROPERTY_HINT_ENUM, ///< hint_text= "val1,val2,val3,etc"
 	PROPERTY_HINT_ENUM_SUGGESTION, ///< hint_text= "val1,val2,val3,etc"
 	PROPERTY_HINT_EXP_EASING, /// exponential easing function (Math::ease) use "attenuation" hint string to revert (flip h), "positive_only" to exclude in-out and out-in. (ie: "attenuation,positive_only")
@@ -89,8 +89,8 @@ enum PropertyHint {
 	PROPERTY_HINT_SAVE_FILE, ///< a file path must be passed, hint_text (optionally) is a filter "*.png,*.wav,*.doc,". This opens a save dialog
 	PROPERTY_HINT_GLOBAL_SAVE_FILE, ///< a file path must be passed, hint_text (optionally) is a filter "*.png,*.wav,*.doc,". This opens a save dialog
 	PROPERTY_HINT_INT_IS_OBJECTID,
-	PROPERTY_HINT_ARRAY_TYPE,
 	PROPERTY_HINT_INT_IS_POINTER,
+	PROPERTY_HINT_ARRAY_TYPE,
 	PROPERTY_HINT_LOCALE_ID,
 	PROPERTY_HINT_LOCALIZABLE_STRING,
 	PROPERTY_HINT_NODE_TYPE, ///< a node object type
@@ -133,7 +133,7 @@ enum PropertyUsageFlags {
 	PROPERTY_USAGE_ARRAY = 1 << 29, // Used in the inspector to group properties as elements of an array.
 
 	PROPERTY_USAGE_DEFAULT = PROPERTY_USAGE_STORAGE | PROPERTY_USAGE_EDITOR,
-	PROPERTY_USAGE_DEFAULT_INTL = PROPERTY_USAGE_STORAGE | PROPERTY_USAGE_EDITOR | PROPERTY_USAGE_INTERNATIONALIZED,
+	PROPERTY_USAGE_DEFAULT_INTL = PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_INTERNATIONALIZED,
 	PROPERTY_USAGE_NO_EDITOR = PROPERTY_USAGE_STORAGE,
 };
 
@@ -295,6 +295,8 @@ struct ObjectNativeExtension {
 	StringName parent_class_name;
 	StringName class_name;
 	bool editor_class = false;
+	bool is_virtual = false;
+	bool is_abstract = false;
 	GDNativeExtensionClassSet set;
 	GDNativeExtensionClassGet get;
 	GDNativeExtensionClassGetPropertyList get_property_list;
@@ -733,34 +735,12 @@ public:
 
 	template <class T>
 	static T *cast_to(Object *p_object) {
-#ifndef NO_SAFE_CAST
 		return dynamic_cast<T *>(p_object);
-#else
-		if (!p_object) {
-			return nullptr;
-		}
-		if (p_object->is_class_ptr(T::get_class_ptr_static())) {
-			return static_cast<T *>(p_object);
-		} else {
-			return nullptr;
-		}
-#endif
 	}
 
 	template <class T>
 	static const T *cast_to(const Object *p_object) {
-#ifndef NO_SAFE_CAST
 		return dynamic_cast<const T *>(p_object);
-#else
-		if (!p_object) {
-			return nullptr;
-		}
-		if (p_object->is_class_ptr(T::get_class_ptr_static())) {
-			return static_cast<const T *>(p_object);
-		} else {
-			return nullptr;
-		}
-#endif
 	}
 
 	enum {

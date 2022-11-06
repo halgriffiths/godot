@@ -60,6 +60,7 @@ void PhysicsDirectBodyState3DExtension::_bind_methods() {
 
 	GDVIRTUAL_BIND(_get_inverse_mass);
 	GDVIRTUAL_BIND(_get_inverse_inertia);
+	GDVIRTUAL_BIND(_get_inverse_inertia_tensor);
 
 	GDVIRTUAL_BIND(_set_linear_velocity, "velocity");
 	GDVIRTUAL_BIND(_get_linear_velocity);
@@ -192,7 +193,10 @@ void PhysicsServer3DExtension::_bind_methods() {
 	GDVIRTUAL_BIND(_area_get_transform, "area");
 
 	GDVIRTUAL_BIND(_area_set_collision_layer, "area", "layer");
+	GDVIRTUAL_BIND(_area_get_collision_layer, "area");
+
 	GDVIRTUAL_BIND(_area_set_collision_mask, "area", "mask");
+	GDVIRTUAL_BIND(_area_get_collision_mask, "area");
 
 	GDVIRTUAL_BIND(_area_set_monitorable, "area", "monitorable");
 	GDVIRTUAL_BIND(_area_set_ray_pickable, "area", "enable");
@@ -284,7 +288,7 @@ void PhysicsServer3DExtension::_bind_methods() {
 	GDVIRTUAL_BIND(_body_set_omit_force_integration, "body", "enable");
 	GDVIRTUAL_BIND(_body_is_omitting_force_integration, "body");
 
-	GDVIRTUAL_BIND(_body_set_state_sync_callback, "body", "callback");
+	GDVIRTUAL_BIND(_body_set_state_sync_callback, "body", "callable");
 	GDVIRTUAL_BIND(_body_set_force_integration_callback, "body", "callable", "userdata");
 
 	GDVIRTUAL_BIND(_body_set_ray_pickable, "body", "enable");

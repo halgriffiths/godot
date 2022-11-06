@@ -42,9 +42,9 @@
 #include "servers/rendering/renderer_compositor.h"
 #include "servers/rendering_server.h"
 
-#include <fcntl.h>
 #include <io.h>
 #include <stdio.h>
+
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
@@ -183,6 +183,8 @@ public:
 	virtual MainLoop *get_main_loop() const;
 
 	virtual String get_name() const;
+	virtual String get_distribution_name() const;
+	virtual String get_version() const;
 
 	virtual DateTime get_datetime(bool p_utc) const;
 	virtual TimeZoneInfo get_time_zone_info() const;

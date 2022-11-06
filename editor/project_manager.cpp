@@ -92,9 +92,9 @@ private:
 	Container *name_container;
 	Container *path_container;
 	Container *install_path_container;
-	Container *rasterizer_container;
+	Container *renderer_container;
 	HBoxContainer *default_files_container;
-	Ref<ButtonGroup> rasterizer_button_group;
+	Ref<ButtonGroup> renderer_button_group;
 	Label *msg;
 	LineEdit *project_path;
 	LineEdit *project_name;
@@ -143,7 +143,11 @@ private:
 			install_status_rect->set_texture(new_icon);
 		}
 
-		set_size(Size2(500, 0) * EDSCALE);
+		Size2i window_size = get_size();
+		Size2 contents_min_size = get_contents_minimum_size();
+		if (window_size.x < contents_min_size.x || window_size.y < contents_min_size.y) {
+			set_size(window_size.max(contents_min_size));
+		}
 	}
 
 	String _test_path() {
@@ -473,16 +477,19 @@ private:
 					}
 					PackedStringArray project_features = ProjectSettings::get_required_features();
 					ProjectSettings::CustomMap initial_settings;
+
 					// Be sure to change this code if/when renderers are changed.
-					int renderer_type = rasterizer_button_group->get_pressed_button()->get_meta(SNAME("driver_name"));
-					initial_settings["rendering/vulkan/rendering/back_end"] = renderer_type;
-					if (renderer_type == 0) {
-						project_features.push_back("Vulkan Clustered");
-					} else if (renderer_type == 1) {
-						project_features.push_back("Vulkan Mobile");
+					String renderer_type = renderer_button_group->get_pressed_button()->get_meta(SNAME("rendering_method"));
+					initial_settings["rendering/renderer/rendering_method"] = renderer_type;
+
+					if (renderer_type == "forward_plus") {
+						project_features.push_back("Forward Plus");
+					} else if (renderer_type == "mobile") {
+						project_features.push_back("Mobile");
 					} else {
 						WARN_PRINT("Unknown renderer type. Please report this as a bug on GitHub.");
 					}
+
 					project_features.sort();
 					initial_settings["application/config/features"] = project_features;
 					initial_settings["application/config/name"] = project_name->get_text().strip_edges();
@@ -560,19 +567,19 @@ private:
 							Ref<DirAccess> da = DirAccess::create(DirAccess::ACCESS_FILESYSTEM);
 							da->make_dir(dir.path_join(rel_path));
 						} else {
-							Vector<uint8_t> data;
-							data.resize(info.uncompressed_size);
+							Vector<uint8_t> uncomp_data;
+							uncomp_data.resize(info.uncompressed_size);
 							String rel_path = path.substr(zip_root.length());
 
 							//read
 							unzOpenCurrentFile(pkg);
-							ret = unzReadCurrentFile(pkg, data.ptrw(), data.size());
+							ret = unzReadCurrentFile(pkg, uncomp_data.ptrw(), uncomp_data.size());
 							ERR_BREAK_MSG(ret < 0, vformat("An error occurred while attempting to read from file: %s. This file will not be used.", rel_path));
 							unzCloseCurrentFile(pkg);
 
 							Ref<FileAccess> f = FileAccess::open(dir.path_join(rel_path), FileAccess::WRITE);
 							if (f.is_valid()) {
-								f->store_buffer(data.ptr(), data.size());
+								f->store_buffer(uncomp_data.ptr(), uncomp_data.size());
 							} else {
 								failed_files.push_back(rel_path);
 							}
@@ -684,7 +691,7 @@ public:
 			msg->hide();
 			install_path_container->hide();
 			install_status_rect->hide();
-			rasterizer_container->hide();
+			renderer_container->hide();
 			default_files_container->hide();
 			get_ok_button()->set_disabled(false);
 
@@ -707,7 +714,7 @@ public:
 			create_dir->hide();
 
 		} else {
-			fav_dir = EditorSettings::get_singleton()->get("filesystem/directories/default_project_path");
+			fav_dir = EDITOR_GET("filesystem/directories/default_project_path");
 			if (!fav_dir.is_empty()) {
 				project_path->set_text(fav_dir);
 				fdialog->set_current_dir(fav_dir);
@@ -735,7 +742,7 @@ public:
 				set_ok_button_text(TTR("Import & Edit"));
 				name_container->hide();
 				install_path_container->hide();
-				rasterizer_container->hide();
+				renderer_container->hide();
 				default_files_container->hide();
 				project_path->grab_focus();
 
@@ -744,7 +751,7 @@ public:
 				set_ok_button_text(TTR("Create & Edit"));
 				name_container->show();
 				install_path_container->hide();
-				rasterizer_container->show();
+				renderer_container->show();
 				default_files_container->show();
 				project_name->call_deferred(SNAME("grab_focus"));
 				project_name->call_deferred(SNAME("select_all"));
@@ -755,7 +762,7 @@ public:
 				project_name->set_text(zip_title);
 				name_container->show();
 				install_path_container->hide();
-				rasterizer_container->hide();
+				renderer_container->hide();
 				default_files_container->hide();
 				project_path->grab_focus();
 			}
@@ -843,23 +850,23 @@ public:
 		msg->set_horizontal_alignment(HORIZONTAL_ALIGNMENT_CENTER);
 		vb->add_child(msg);
 
-		// rasterizer selection
-		rasterizer_container = memnew(VBoxContainer);
-		vb->add_child(rasterizer_container);
+		// Renderer selection.
+		renderer_container = memnew(VBoxContainer);
+		vb->add_child(renderer_container);
 		l = memnew(Label);
 		l->set_text(TTR("Renderer:"));
-		rasterizer_container->add_child(l);
-		Container *rshb = memnew(HBoxContainer);
-		rasterizer_container->add_child(rshb);
-		rasterizer_button_group.instantiate();
+		renderer_container->add_child(l);
+		HBoxContainer *rshc = memnew(HBoxContainer);
+		renderer_container->add_child(rshc);
+		renderer_button_group.instantiate();
 
 		Container *rvb = memnew(VBoxContainer);
 		rvb->set_h_size_flags(Control::SIZE_EXPAND_FILL);
-		rshb->add_child(rvb);
+		rshc->add_child(rvb);
 		Button *rs_button = memnew(CheckBox);
-		rs_button->set_button_group(rasterizer_button_group);
-		rs_button->set_text(TTR("Vulkan Clustered"));
-		rs_button->set_meta(SNAME("driver_name"), 0); // Vulkan backend "Forward Clustered"
+		rs_button->set_button_group(renderer_button_group);
+		rs_button->set_text(TTR("Forward+"));
+		rs_button->set_meta(SNAME("rendering_method"), "forward_plus");
 		rs_button->set_pressed(true);
 		rvb->add_child(rs_button);
 		l = memnew(Label);
@@ -871,15 +878,15 @@ public:
 		l->set_modulate(Color(1, 1, 1, 0.7));
 		rvb->add_child(l);
 
-		rshb->add_child(memnew(VSeparator));
+		rshc->add_child(memnew(VSeparator));
 
 		rvb = memnew(VBoxContainer);
 		rvb->set_h_size_flags(Control::SIZE_EXPAND_FILL);
-		rshb->add_child(rvb);
+		rshc->add_child(rvb);
 		rs_button = memnew(CheckBox);
-		rs_button->set_button_group(rasterizer_button_group);
-		rs_button->set_text(TTR("Vulkan Mobile"));
-		rs_button->set_meta(SNAME("driver_name"), 1); // Vulkan backend "Forward Mobile"
+		rs_button->set_button_group(renderer_button_group);
+		rs_button->set_text(TTR("Mobile"));
+		rs_button->set_meta(SNAME("rendering_method"), "mobile");
 		rvb->add_child(rs_button);
 		l = memnew(Label);
 		l->set_text(
@@ -897,7 +904,7 @@ public:
 		l->set_horizontal_alignment(HORIZONTAL_ALIGNMENT_CENTER);
 		l->set_vertical_alignment(VERTICAL_ALIGNMENT_CENTER);
 		l->set_modulate(Color(1, 1, 1, 0.7));
-		rasterizer_container->add_child(l);
+		renderer_container->add_child(l);
 
 		default_files_container = memnew(HBoxContainer);
 		vb->add_child(default_files_container);
@@ -1258,7 +1265,7 @@ void ProjectList::migrate_config() {
 			continue;
 		}
 
-		String path = EditorSettings::get_singleton()->get(property_key);
+		String path = EDITOR_GET(property_key);
 		String favoriteKey = "favorite_projects/" + property_key.get_slice("/", 1);
 		bool favorite = EditorSettings::get_singleton()->has_setting(favoriteKey);
 		add_project(path, favorite);
@@ -1487,7 +1494,7 @@ void ProjectList::sort_projects() {
 	for (int i = 0; i < _projects.size(); ++i) {
 		Item &item = _projects.write[i];
 
-		bool visible = true;
+		bool item_visible = true;
 		if (!_search_term.is_empty()) {
 			String search_path;
 			if (_search_term.contains("/")) {
@@ -1499,10 +1506,10 @@ void ProjectList::sort_projects() {
 			}
 
 			// When searching, display projects whose name or path contain the search term
-			visible = item.project_name.findn(_search_term) != -1 || search_path.findn(_search_term) != -1;
+			item_visible = item.project_name.findn(_search_term) != -1 || search_path.findn(_search_term) != -1;
 		}
 
-		item.control->set_visible(visible);
+		item.control->set_visible(item_visible);
 	}
 
 	for (int i = 0; i < _projects.size(); ++i) {
@@ -1909,7 +1916,7 @@ void ProjectManager::_notification(int p_what) {
 		} break;
 
 		case NOTIFICATION_READY: {
-			int default_sorting = (int)EditorSettings::get_singleton()->get("project_manager/sorting_order");
+			int default_sorting = (int)EDITOR_GET("project_manager/sorting_order");
 			filter_option->select(default_sorting);
 			_project_list->set_order_option(default_sorting);
 
@@ -2554,7 +2561,7 @@ ProjectManager::ProjectManager() {
 	EditorSettings::get_singleton()->set_optimize_save(false); //just write settings as they came
 
 	{
-		int display_scale = EditorSettings::get_singleton()->get("interface/editor/display_scale");
+		int display_scale = EDITOR_GET("interface/editor/display_scale");
 
 		switch (display_scale) {
 			case 0:
@@ -2580,7 +2587,7 @@ ProjectManager::ProjectManager() {
 				editor_set_scale(2.0);
 				break;
 			default:
-				editor_set_scale(EditorSettings::get_singleton()->get("interface/editor/custom_display_scale"));
+				editor_set_scale(EDITOR_GET("interface/editor/custom_display_scale"));
 				break;
 		}
 		EditorFileDialog::get_icon_func = &ProjectManager::_file_dialog_get_icon;
@@ -2589,7 +2596,13 @@ ProjectManager::ProjectManager() {
 	// TRANSLATORS: This refers to the application where users manage their Godot projects.
 	DisplayServer::get_singleton()->window_set_title(VERSION_NAME + String(" - ") + TTR("Project Manager", "Application"));
 
-	EditorFileDialog::set_default_show_hidden_files(EditorSettings::get_singleton()->get("filesystem/file_dialog/show_hidden_files"));
+	EditorFileDialog::set_default_show_hidden_files(EDITOR_GET("filesystem/file_dialog/show_hidden_files"));
+
+	int swap_cancel_ok = EDITOR_GET("interface/editor/accept_dialog_cancel_ok_buttons");
+	if (swap_cancel_ok != 0) { // 0 is auto, set in register_scene based on DisplayServer.
+		// Swap on means OK first.
+		AcceptDialog::set_swap_cancel_ok(swap_cancel_ok == 2);
+	}
 
 	set_anchors_and_offsets_preset(Control::PRESET_FULL_RECT);
 	set_theme(create_custom_theme());
@@ -2802,7 +2815,7 @@ ProjectManager::ProjectManager() {
 			}
 		}
 
-		String current_lang = EditorSettings::get_singleton()->get("interface/editor/editor_language");
+		String current_lang = EDITOR_GET("interface/editor/editor_language");
 		language_btn->set_text(current_lang);
 
 		for (int i = 0; i < editor_languages.size(); i++) {
@@ -2841,7 +2854,7 @@ ProjectManager::ProjectManager() {
 		scan_dir->set_access(EditorFileDialog::ACCESS_FILESYSTEM);
 		scan_dir->set_file_mode(EditorFileDialog::FILE_MODE_OPEN_DIR);
 		scan_dir->set_title(TTR("Select a Folder to Scan")); // must be after mode or it's overridden
-		scan_dir->set_current_dir(EditorSettings::get_singleton()->get("filesystem/directories/default_project_path"));
+		scan_dir->set_current_dir(EDITOR_GET("filesystem/directories/default_project_path"));
 		add_child(scan_dir);
 		scan_dir->connect("dir_selected", callable_mp(this, &ProjectManager::_scan_begin));
 
@@ -2923,7 +2936,7 @@ ProjectManager::ProjectManager() {
 
 	Ref<DirAccess> dir_access = DirAccess::create(DirAccess::AccessType::ACCESS_FILESYSTEM);
 
-	String default_project_path = EditorSettings::get_singleton()->get("filesystem/directories/default_project_path");
+	String default_project_path = EDITOR_GET("filesystem/directories/default_project_path");
 	if (!dir_access->dir_exists(default_project_path)) {
 		Error error = dir_access->make_dir_recursive(default_project_path);
 		if (error != OK) {
@@ -2931,7 +2944,7 @@ ProjectManager::ProjectManager() {
 		}
 	}
 
-	String autoscan_path = EditorSettings::get_singleton()->get("filesystem/directories/autoscan_project_path");
+	String autoscan_path = EDITOR_GET("filesystem/directories/autoscan_project_path");
 	if (!autoscan_path.is_empty()) {
 		if (dir_access->dir_exists(autoscan_path)) {
 			_scan_begin(autoscan_path);

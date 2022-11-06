@@ -184,9 +184,9 @@ void EditorHelp::_class_desc_input(const Ref<InputEvent> &p_input) {
 void EditorHelp::_class_desc_resized(bool p_force_update_theme) {
 	// Add extra horizontal margins for better readability.
 	// The margins increase as the width of the editor help container increases.
-	Ref<Font> doc_code_font = get_theme_font(SNAME("doc_source"), SNAME("EditorFonts"));
+	Ref<Font> font = get_theme_font(SNAME("doc_source"), SNAME("EditorFonts"));
 	int font_size = get_theme_font_size(SNAME("doc_source_size"), SNAME("EditorFonts"));
-	real_t char_width = doc_code_font->get_char_size('x', font_size).width;
+	real_t char_width = font->get_char_size('x', font_size).width;
 	const int new_display_margin = MAX(30 * EDSCALE, get_parent_anchorable_rect().size.width - char_width * 120 * EDSCALE) * 0.5;
 	if (display_margin != new_display_margin || p_force_update_theme) {
 		display_margin = new_display_margin;
@@ -368,8 +368,29 @@ void EditorHelp::_add_method(const DocData::MethodDoc &p_method, bool p_overview
 	class_desc->pop();
 	if (!p_method.qualifiers.is_empty()) {
 		class_desc->push_color(qualifier_color);
-		class_desc->add_text(" ");
-		_add_text(p_method.qualifiers);
+
+		PackedStringArray qualifiers = p_method.qualifiers.split_spaces();
+		for (const String &qualifier : qualifiers) {
+			String hint;
+			if (qualifier == "vararg") {
+				hint = TTR("This method supports a variable number of arguments.");
+			} else if (qualifier == "virtual") {
+				hint = TTR("This method is called by the engine.\nIt can be overridden to customize built-in behavior.");
+			} else if (qualifier == "const") {
+				hint = TTR("This method has no side effects.\nIt does not modify the object in any way.");
+			} else if (qualifier == "static") {
+				hint = TTR("This method does not need an instance to be called.\nIt can be called directly using the class name.");
+			}
+
+			class_desc->add_text(" ");
+			if (!hint.is_empty()) {
+				class_desc->push_hint(hint);
+				class_desc->add_text(qualifier);
+				class_desc->pop();
+			} else {
+				class_desc->add_text(qualifier);
+			}
+		}
 		class_desc->pop();
 	}
 
@@ -412,13 +433,13 @@ Error EditorHelp::_goto_desc(const String &p_class, int p_vscr) {
 }
 
 void EditorHelp::_update_method_list(const Vector<DocData::MethodDoc> p_methods, bool &r_method_descrpitons) {
-	Ref<Font> doc_code_font = get_theme_font(SNAME("doc_source"), SNAME("EditorFonts"));
+	Ref<Font> font = get_theme_font(SNAME("doc_source"), SNAME("EditorFonts"));
 	class_desc->pop(); // title font size
 	class_desc->pop(); // title font
 	class_desc->pop(); // title color
 
 	class_desc->add_newline();
-	class_desc->push_font(doc_code_font);
+	class_desc->push_font(font);
 	class_desc->push_indent(1);
 	class_desc->push_table(2);
 	class_desc->set_table_column_expand(1, true);
@@ -479,9 +500,8 @@ void EditorHelp::_update_method_list(const Vector<DocData::MethodDoc> p_methods,
 }
 
 void EditorHelp::_update_method_descriptions(const DocData::ClassDoc p_classdoc, const Vector<DocData::MethodDoc> p_methods, const String &p_method_type) {
-	Ref<Font> doc_font = get_theme_font(SNAME("doc"), SNAME("EditorFonts"));
-	Ref<Font> doc_bold_font = get_theme_font(SNAME("doc_bold"), SNAME("EditorFonts"));
-	Ref<Font> doc_code_font = get_theme_font(SNAME("doc_source"), SNAME("EditorFonts"));
+	Ref<Font> font = get_theme_font(SNAME("doc"), SNAME("EditorFonts"));
+	Ref<Font> code_font = get_theme_font(SNAME("doc_source"), SNAME("EditorFonts"));
 	String link_color_text = title_color.to_html(false);
 	class_desc->pop(); // title font size
 	class_desc->pop(); // title font
@@ -501,7 +521,7 @@ void EditorHelp::_update_method_descriptions(const DocData::ClassDoc p_classdoc,
 		}
 
 		for (int i = 0; i < methods_filtered.size(); i++) {
-			class_desc->push_font(doc_code_font);
+			class_desc->push_font(code_font);
 			_add_method(methods_filtered[i], false);
 			class_desc->pop();
 
@@ -509,7 +529,7 @@ void EditorHelp::_update_method_descriptions(const DocData::ClassDoc p_classdoc,
 			class_desc->add_newline();
 
 			class_desc->push_color(text_color);
-			class_desc->push_font(doc_font);
+			class_desc->push_font(font);
 			class_desc->push_indent(1);
 			if (methods_filtered[i].errors_returned.size()) {
 				class_desc->append_text(TTR("Error codes returned:"));
@@ -928,7 +948,7 @@ void EditorHelp::_update_doc() {
 	bool constructor_descriptions = false;
 	bool method_descriptions = false;
 	bool operator_descriptions = false;
-	bool sort_methods = EditorSettings::get_singleton()->get("text_editor/help/sort_functions_alphabetically");
+	bool sort_methods = EDITOR_GET("text_editor/help/sort_functions_alphabetically");
 
 	Vector<DocData::MethodDoc> methods;
 
@@ -2305,7 +2325,6 @@ EditorHelpBit::EditorHelpBit() {
 	rich_text = memnew(RichTextLabel);
 	add_child(rich_text);
 	rich_text->connect("meta_clicked", callable_mp(this, &EditorHelpBit::_meta_clicked));
-	rich_text->set_override_selected_font_color(false);
 	rich_text->set_fit_content_height(true);
 	set_custom_minimum_size(Size2(0, 50 * EDSCALE));
 }

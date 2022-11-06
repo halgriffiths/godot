@@ -563,6 +563,57 @@ bool TreeItem::is_collapsed() {
 	return collapsed;
 }
 
+void TreeItem::set_collapsed_recursive(bool p_collapsed) {
+	if (!tree) {
+		return;
+	}
+
+	set_collapsed(p_collapsed);
+
+	TreeItem *child = get_first_child();
+	while (child) {
+		child->set_collapsed_recursive(p_collapsed);
+		child = child->get_next();
+	}
+}
+
+bool TreeItem::_is_any_collapsed(bool p_only_visible) {
+	TreeItem *child = get_first_child();
+
+	// Check on children directly first (avoid recursing if possible).
+	while (child) {
+		if (child->get_first_child() && child->is_collapsed() && (!p_only_visible || (child->is_visible() && child->get_visible_child_count()))) {
+			return true;
+		}
+		child = child->get_next();
+	}
+
+	child = get_first_child();
+
+	// Otherwise recurse on children.
+	while (child) {
+		if (child->get_first_child() && (!p_only_visible || (child->is_visible() && child->get_visible_child_count())) && child->_is_any_collapsed(p_only_visible)) {
+			return true;
+		}
+		child = child->get_next();
+	}
+
+	return false;
+}
+
+bool TreeItem::is_any_collapsed(bool p_only_visible) {
+	if (p_only_visible && !is_visible()) {
+		return false;
+	}
+
+	// Collapsed if this is collapsed and it has children (only considers visible if only visible is set).
+	if (is_collapsed() && get_first_child() && (!p_only_visible || get_visible_child_count())) {
+		return true;
+	}
+
+	return _is_any_collapsed(p_only_visible);
+}
+
 void TreeItem::set_visible(bool p_visible) {
 	if (visible == p_visible) {
 		return;
@@ -687,9 +738,9 @@ TreeItem *TreeItem::get_first_child() const {
 TreeItem *TreeItem::_get_prev_visible(bool p_wrap) {
 	TreeItem *current = this;
 
-	TreeItem *prev = current->get_prev();
+	TreeItem *prev_item = current->get_prev();
 
-	if (!prev) {
+	if (!prev_item) {
 		current = current->parent;
 		if (current == tree->root && tree->hide_root) {
 			return nullptr;
@@ -706,7 +757,7 @@ TreeItem *TreeItem::_get_prev_visible(bool p_wrap) {
 			}
 		}
 	} else {
-		current = prev;
+		current = prev_item;
 		while (!current->collapsed && current->first_child) {
 			//go to the very end
 
@@ -722,16 +773,16 @@ TreeItem *TreeItem::_get_prev_visible(bool p_wrap) {
 
 TreeItem *TreeItem::get_prev_visible(bool p_wrap) {
 	TreeItem *loop = this;
-	TreeItem *prev = this->_get_prev_visible(p_wrap);
-	while (prev && !prev->is_visible()) {
-		prev = prev->_get_prev_visible(p_wrap);
-		if (prev == loop) {
+	TreeItem *prev_item = this->_get_prev_visible(p_wrap);
+	while (prev_item && !prev_item->is_visible()) {
+		prev_item = prev_item->_get_prev_visible(p_wrap);
+		if (prev_item == loop) {
 			// Check that we haven't looped all the way around to the start.
-			prev = nullptr;
+			prev_item = nullptr;
 			break;
 		}
 	}
-	return prev;
+	return prev_item;
 }
 
 TreeItem *TreeItem::_get_next_visible(bool p_wrap) {
@@ -763,16 +814,16 @@ TreeItem *TreeItem::_get_next_visible(bool p_wrap) {
 
 TreeItem *TreeItem::get_next_visible(bool p_wrap) {
 	TreeItem *loop = this;
-	TreeItem *next = this->_get_next_visible(p_wrap);
-	while (next && !next->is_visible()) {
-		next = next->_get_next_visible(p_wrap);
-		if (next == loop) {
+	TreeItem *next_item = this->_get_next_visible(p_wrap);
+	while (next_item && !next_item->is_visible()) {
+		next_item = next_item->_get_next_visible(p_wrap);
+		if (next_item == loop) {
 			// Check that we haven't looped all the way around to the start.
-			next = nullptr;
+			next_item = nullptr;
 			break;
 		}
 	}
-	return next;
+	return next_item;
 }
 
 TreeItem *TreeItem::get_child(int p_idx) {
@@ -1112,7 +1163,7 @@ bool TreeItem::is_editable(int p_column) {
 void TreeItem::set_custom_color(int p_column, const Color &p_color) {
 	ERR_FAIL_INDEX(p_column, cells.size());
 
-	if (cells[p_column].custom_color == true) {
+	if (cells[p_column].custom_color && cells[p_column].color == p_color) {
 		return;
 	}
 
@@ -1266,8 +1317,8 @@ bool TreeItem::is_folding_disabled() const {
 
 Size2 TreeItem::get_minimum_size(int p_column) {
 	ERR_FAIL_INDEX_V(p_column, cells.size(), Size2());
-	Tree *tree = get_tree();
-	ERR_FAIL_COND_V(!tree, Size2());
+	Tree *parent_tree = get_tree();
+	ERR_FAIL_COND_V(!parent_tree, Size2());
 
 	const TreeItem::Cell &cell = cells[p_column];
 
@@ -1277,7 +1328,7 @@ Size2 TreeItem::get_minimum_size(int p_column) {
 		// Text.
 		if (!cell.text.is_empty()) {
 			if (cell.dirty) {
-				tree->update_item_cell(this, p_column);
+				parent_tree->update_item_cell(this, p_column);
 			}
 			Size2 text_size = cell.text_buf->get_size();
 			size.width += text_size.width;
@@ -1286,14 +1337,14 @@ Size2 TreeItem::get_minimum_size(int p_column) {
 
 		// Icon.
 		if (cell.mode == CELL_MODE_CHECK) {
-			size.width += tree->theme_cache.checked->get_width() + tree->theme_cache.hseparation;
+			size.width += parent_tree->theme_cache.checked->get_width() + parent_tree->theme_cache.hseparation;
 		}
 		if (cell.icon.is_valid()) {
 			Size2i icon_size = cell.get_icon_size();
 			if (cell.icon_max_w > 0 && icon_size.width > cell.icon_max_w) {
 				icon_size.width = cell.icon_max_w;
 			}
-			size.width += icon_size.width + tree->theme_cache.hseparation;
+			size.width += icon_size.width + parent_tree->theme_cache.hseparation;
 			size.height = MAX(size.height, icon_size.height);
 		}
 
@@ -1301,13 +1352,13 @@ Size2 TreeItem::get_minimum_size(int p_column) {
 		for (int i = 0; i < cell.buttons.size(); i++) {
 			Ref<Texture2D> texture = cell.buttons[i].texture;
 			if (texture.is_valid()) {
-				Size2 button_size = texture->get_size() + tree->theme_cache.button_pressed->get_minimum_size();
+				Size2 button_size = texture->get_size() + parent_tree->theme_cache.button_pressed->get_minimum_size();
 				size.width += button_size.width;
 				size.height = MAX(size.height, button_size.height);
 			}
 		}
 		if (cell.buttons.size() >= 2) {
-			size.width += (cell.buttons.size() - 1) * tree->theme_cache.button_margin;
+			size.width += (cell.buttons.size() - 1) * parent_tree->theme_cache.button_margin;
 		}
 
 		cells.write[p_column].cached_minimum_size = size;
@@ -1406,6 +1457,9 @@ void TreeItem::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_collapsed", "enable"), &TreeItem::set_collapsed);
 	ClassDB::bind_method(D_METHOD("is_collapsed"), &TreeItem::is_collapsed);
 
+	ClassDB::bind_method(D_METHOD("set_collapsed_recursive", "enable"), &TreeItem::set_collapsed_recursive);
+	ClassDB::bind_method(D_METHOD("is_any_collapsed", "only_visible"), &TreeItem::is_any_collapsed, DEFVAL(false));
+
 	ClassDB::bind_method(D_METHOD("set_visible", "enable"), &TreeItem::set_visible);
 	ClassDB::bind_method(D_METHOD("is_visible"), &TreeItem::is_visible);
 
@@ -1450,6 +1504,7 @@ void TreeItem::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_button", "column", "button_idx", "button"), &TreeItem::set_button);
 	ClassDB::bind_method(D_METHOD("erase_button", "column", "button_idx"), &TreeItem::erase_button);
 	ClassDB::bind_method(D_METHOD("set_button_disabled", "column", "button_idx", "disabled"), &TreeItem::set_button_disabled);
+	ClassDB::bind_method(D_METHOD("set_button_color", "column", "button_idx", "color"), &TreeItem::set_button_color);
 	ClassDB::bind_method(D_METHOD("is_button_disabled", "column", "button_idx"), &TreeItem::is_button_disabled);
 
 	ClassDB::bind_method(D_METHOD("set_tooltip_text", "column", "tooltip"), &TreeItem::set_tooltip_text);
@@ -2572,7 +2627,11 @@ int Tree::propagate_mouse_event(const Point2i &p_pos, int x_ofs, int y_ofs, int 
 		}
 
 		if (!p_item->disable_folding && !hide_folding && p_item->first_child && (p_pos.x >= x_ofs && p_pos.x < (x_ofs + theme_cache.item_margin))) {
-			p_item->set_collapsed(!p_item->is_collapsed());
+			if (enable_recursive_folding && p_mod->is_shift_pressed()) {
+				p_item->set_collapsed_recursive(!p_item->is_collapsed());
+			} else {
+				p_item->set_collapsed(!p_item->is_collapsed());
+			}
 			return -1;
 		}
 
@@ -2623,7 +2682,11 @@ int Tree::propagate_mouse_event(const Point2i &p_pos, int x_ofs, int y_ofs, int 
 		}
 
 		if (!p_item->disable_folding && !hide_folding && !p_item->cells[col].editable && !p_item->cells[col].selectable && p_item->get_first_child()) {
-			p_item->set_collapsed(!p_item->is_collapsed());
+			if (enable_recursive_folding && p_mod->is_shift_pressed()) {
+				p_item->set_collapsed_recursive(!p_item->is_collapsed());
+			} else {
+				p_item->set_collapsed(!p_item->is_collapsed());
+			}
 			return -1; //collapse/uncollapse because nothing can be done with item
 		}
 
@@ -3128,7 +3191,7 @@ void Tree::gui_input(const Ref<InputEvent> &p_event) {
 	Ref<InputEventKey> k = p_event;
 
 	bool is_command = k.is_valid() && k->is_command_or_control_pressed();
-	if (p_event->is_action("ui_right") && p_event->is_pressed()) {
+	if (p_event->is_action("ui_right", true) && p_event->is_pressed()) {
 		if (!cursor_can_exit_tree) {
 			accept_event();
 		}
@@ -3146,7 +3209,7 @@ void Tree::gui_input(const Ref<InputEvent> &p_event) {
 		} else {
 			_go_right();
 		}
-	} else if (p_event->is_action("ui_left") && p_event->is_pressed()) {
+	} else if (p_event->is_action("ui_left", true) && p_event->is_pressed()) {
 		if (!cursor_can_exit_tree) {
 			accept_event();
 		}
@@ -3166,21 +3229,21 @@ void Tree::gui_input(const Ref<InputEvent> &p_event) {
 			_go_left();
 		}
 
-	} else if (p_event->is_action("ui_up") && p_event->is_pressed() && !is_command) {
+	} else if (p_event->is_action("ui_up", true) && p_event->is_pressed() && !is_command) {
 		if (!cursor_can_exit_tree) {
 			accept_event();
 		}
 
 		_go_up();
 
-	} else if (p_event->is_action("ui_down") && p_event->is_pressed() && !is_command) {
+	} else if (p_event->is_action("ui_down", true) && p_event->is_pressed() && !is_command) {
 		if (!cursor_can_exit_tree) {
 			accept_event();
 		}
 
 		_go_down();
 
-	} else if (p_event->is_action("ui_page_down") && p_event->is_pressed()) {
+	} else if (p_event->is_action("ui_page_down", true) && p_event->is_pressed()) {
 		if (!cursor_can_exit_tree) {
 			accept_event();
 		}
@@ -3218,7 +3281,7 @@ void Tree::gui_input(const Ref<InputEvent> &p_event) {
 		}
 
 		ensure_cursor_is_visible();
-	} else if (p_event->is_action("ui_page_up") && p_event->is_pressed()) {
+	} else if (p_event->is_action("ui_page_up", true) && p_event->is_pressed()) {
 		if (!cursor_can_exit_tree) {
 			accept_event();
 		}
@@ -3255,7 +3318,7 @@ void Tree::gui_input(const Ref<InputEvent> &p_event) {
 			prev->select(selected_col);
 		}
 		ensure_cursor_is_visible();
-	} else if (p_event->is_action("ui_accept") && p_event->is_pressed()) {
+	} else if (p_event->is_action("ui_accept", true) && p_event->is_pressed()) {
 		if (selected_item) {
 			//bring up editor if possible
 			if (!edit_selected()) {
@@ -3264,7 +3327,7 @@ void Tree::gui_input(const Ref<InputEvent> &p_event) {
 			}
 		}
 		accept_event();
-	} else if (p_event->is_action("ui_select") && p_event->is_pressed()) {
+	} else if (p_event->is_action("ui_select", true) && p_event->is_pressed()) {
 		if (select_mode == SELECT_MULTI) {
 			if (!selected_item) {
 				return;
@@ -5026,6 +5089,14 @@ bool Tree::is_folding_hidden() const {
 	return hide_folding;
 }
 
+void Tree::set_enable_recursive_folding(bool p_enable) {
+	enable_recursive_folding = p_enable;
+}
+
+bool Tree::is_recursive_folding_enabled() const {
+	return enable_recursive_folding;
+}
+
 void Tree::set_drop_mode_flags(int p_flags) {
 	if (drop_mode_flags == p_flags) {
 		return;
@@ -5129,6 +5200,9 @@ void Tree::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_hide_folding", "hide"), &Tree::set_hide_folding);
 	ClassDB::bind_method(D_METHOD("is_folding_hidden"), &Tree::is_folding_hidden);
 
+	ClassDB::bind_method(D_METHOD("set_enable_recursive_folding", "enable"), &Tree::set_enable_recursive_folding);
+	ClassDB::bind_method(D_METHOD("is_recursive_folding_enabled"), &Tree::is_recursive_folding_enabled);
+
 	ClassDB::bind_method(D_METHOD("set_drop_mode_flags", "flags"), &Tree::set_drop_mode_flags);
 	ClassDB::bind_method(D_METHOD("get_drop_mode_flags"), &Tree::get_drop_mode_flags);
 
@@ -5143,6 +5217,7 @@ void Tree::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "allow_reselect"), "set_allow_reselect", "get_allow_reselect");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "allow_rmb_select"), "set_allow_rmb_select", "get_allow_rmb_select");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "hide_folding"), "set_hide_folding", "is_folding_hidden");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "enable_recursive_folding"), "set_enable_recursive_folding", "is_recursive_folding_enabled");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "hide_root"), "set_hide_root", "is_root_hidden");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "drop_mode_flags", PROPERTY_HINT_FLAGS, "On Item,In Between"), "set_drop_mode_flags", "get_drop_mode_flags");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "select_mode", PROPERTY_HINT_ENUM, "Single,Row,Multi"), "set_select_mode", "get_select_mode");

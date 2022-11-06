@@ -101,10 +101,15 @@ const PackedStringArray ProjectSettings::_get_supported_features() {
 	features.append(VERSION_BRANCH "." _MKSTR(VERSION_PATCH));
 	features.append(VERSION_FULL_CONFIG);
 	features.append(VERSION_FULL_BUILD);
-	// For now, assume Vulkan is always supported.
-	// This should be removed if it's possible to build the editor without Vulkan.
-	features.append("Vulkan Clustered");
-	features.append("Vulkan Mobile");
+
+#ifdef VULKAN_ENABLED
+	features.append("Forward Plus");
+	features.append("Mobile");
+#endif
+
+#ifdef GLES3_ENABLED
+	features.append("GL Compatibility");
+#endif
 	return features;
 }
 
@@ -114,6 +119,10 @@ const PackedStringArray ProjectSettings::get_unsupported_features(const PackedSt
 	PackedStringArray supported_features = singleton->_get_supported_features();
 	for (int i = 0; i < p_project_features.size(); i++) {
 		if (!supported_features.has(p_project_features[i])) {
+			// Temporary compatibility code to ease upgrade to 4.0 beta 2+.
+			if (p_project_features[i].begins_with("Vulkan")) {
+				continue;
+			}
 			unsupported_features.append(p_project_features[i]);
 		}
 	}
@@ -144,8 +153,23 @@ const PackedStringArray ProjectSettings::_trim_to_supported_features(const Packe
 #endif // TOOLS_ENABLED
 
 String ProjectSettings::localize_path(const String &p_path) const {
-	if (resource_path.is_empty() || p_path.begins_with("res://") || p_path.begins_with("user://") ||
-			(p_path.is_absolute_path() && !p_path.begins_with(resource_path))) {
+	if (resource_path.is_empty() || (p_path.is_absolute_path() && !p_path.begins_with(resource_path))) {
+		return p_path.simplify_path();
+	}
+
+	// Check if we have a special path (like res://) or a protocol identifier.
+	int p = p_path.find("://");
+	bool found = false;
+	if (p > 0) {
+		found = true;
+		for (int i = 0; i < p; i++) {
+			if (!is_ascii_alphanumeric_char(p_path[i])) {
+				found = false;
+				break;
+			}
+		}
+	}
+	if (found) {
 		return p_path.simplify_path();
 	}
 
@@ -776,7 +800,7 @@ Error ProjectSettings::save() {
 	return error;
 }
 
-Error ProjectSettings::_save_settings_binary(const String &p_file, const RBMap<String, List<String>> &props, const CustomMap &p_custom, const String &p_custom_features) {
+Error ProjectSettings::_save_settings_binary(const String &p_file, const RBMap<String, List<String>> &p_props, const CustomMap &p_custom, const String &p_custom_features) {
 	Error err;
 	Ref<FileAccess> file = FileAccess::open(p_file, FileAccess::WRITE, &err);
 	ERR_FAIL_COND_V_MSG(err != OK, err, "Couldn't save project.binary at " + p_file + ".");
@@ -786,7 +810,7 @@ Error ProjectSettings::_save_settings_binary(const String &p_file, const RBMap<S
 
 	int count = 0;
 
-	for (const KeyValue<String, List<String>> &E : props) {
+	for (const KeyValue<String, List<String>> &E : p_props) {
 		count += E.value.size();
 	}
 
@@ -812,7 +836,7 @@ Error ProjectSettings::_save_settings_binary(const String &p_file, const RBMap<S
 		file->store_32(count); //store how many properties are saved
 	}
 
-	for (const KeyValue<String, List<String>> &E : props) {
+	for (const KeyValue<String, List<String>> &E : p_props) {
 		for (const String &key : E.value) {
 			String k = key;
 			if (!E.key.is_empty()) {
@@ -844,7 +868,7 @@ Error ProjectSettings::_save_settings_binary(const String &p_file, const RBMap<S
 	return OK;
 }
 
-Error ProjectSettings::_save_settings_text(const String &p_file, const RBMap<String, List<String>> &props, const CustomMap &p_custom, const String &p_custom_features) {
+Error ProjectSettings::_save_settings_text(const String &p_file, const RBMap<String, List<String>> &p_props, const CustomMap &p_custom, const String &p_custom_features) {
 	Error err;
 	Ref<FileAccess> file = FileAccess::open(p_file, FileAccess::WRITE, &err);
 
@@ -865,8 +889,8 @@ Error ProjectSettings::_save_settings_text(const String &p_file, const RBMap<Str
 	}
 	file->store_string("\n");
 
-	for (const KeyValue<String, List<String>> &E : props) {
-		if (E.key != props.begin()->key) {
+	for (const KeyValue<String, List<String>> &E : p_props) {
+		if (E.key != p_props.begin()->key) {
 			file->store_string("\n");
 		}
 
@@ -909,7 +933,7 @@ Error ProjectSettings::save_custom(const String &p_path, const CustomMap &p_cust
 		project_features = ProjectSettings::get_required_features();
 	}
 	// Check the rendering API.
-	const String rendering_api = has_setting("rendering/quality/driver/driver_name") ? (String)get_setting("rendering/quality/driver/driver_name") : String();
+	const String rendering_api = has_setting("rendering/renderer/rendering_method") ? (String)get_setting("rendering/renderer/rendering_method") : String();
 	if (!rendering_api.is_empty()) {
 		// Add the rendering API as a project feature if it doesn't already exist.
 		if (!project_features.has(rendering_api)) {
@@ -971,7 +995,7 @@ Error ProjectSettings::save_custom(const String &p_path, const CustomMap &p_cust
 		vclist.insert(vc);
 	}
 
-	RBMap<String, List<String>> props;
+	RBMap<String, List<String>> save_props;
 
 	for (const _VCSort &E : vclist) {
 		String category = E.name;
@@ -985,24 +1009,24 @@ Error ProjectSettings::save_custom(const String &p_path, const CustomMap &p_cust
 			category = category.substr(0, div);
 			name = name.substr(div + 1, name.size());
 		}
-		props[category].push_back(name);
+		save_props[category].push_back(name);
 	}
 
-	String custom_features;
+	String save_features;
 
 	for (int i = 0; i < p_custom_features.size(); i++) {
 		if (i > 0) {
-			custom_features += ",";
+			save_features += ",";
 		}
 
 		String f = p_custom_features[i].strip_edges().replace("\"", "");
-		custom_features += f;
+		save_features += f;
 	}
 
 	if (p_path.ends_with(".godot") || p_path.ends_with("override.cfg")) {
-		return _save_settings_text(p_path, props, p_custom, custom_features);
+		return _save_settings_text(p_path, save_props, p_custom, save_features);
 	} else if (p_path.ends_with(".binary")) {
-		return _save_settings_binary(p_path, props, p_custom, custom_features);
+		return _save_settings_binary(p_path, save_props, p_custom, save_features);
 	} else {
 		ERR_FAIL_V_MSG(ERR_FILE_UNRECOGNIZED, "Unknown config file format: " + p_path + ".");
 	}
@@ -1013,7 +1037,7 @@ Variant _GLOBAL_DEF(const String &p_var, const Variant &p_default, bool p_restar
 	if (!ProjectSettings::get_singleton()->has_setting(p_var)) {
 		ProjectSettings::get_singleton()->set(p_var, p_default);
 	}
-	ret = ProjectSettings::get_singleton()->get(p_var);
+	ret = GLOBAL_GET(p_var);
 
 	ProjectSettings::get_singleton()->set_initial_value(p_var, p_default);
 	ProjectSettings::get_singleton()->set_builtin_order(p_var);
@@ -1139,6 +1163,7 @@ void ProjectSettings::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_order", "name"), &ProjectSettings::get_order);
 	ClassDB::bind_method(D_METHOD("set_initial_value", "name", "value"), &ProjectSettings::set_initial_value);
 	ClassDB::bind_method(D_METHOD("add_property_info", "hint"), &ProjectSettings::_add_property_info_bind);
+	ClassDB::bind_method(D_METHOD("set_restart_if_changed", "name", "restart"), &ProjectSettings::set_restart_if_changed);
 	ClassDB::bind_method(D_METHOD("clear", "name"), &ProjectSettings::clear);
 	ClassDB::bind_method(D_METHOD("localize_path", "path"), &ProjectSettings::localize_path);
 	ClassDB::bind_method(D_METHOD("globalize_path", "path"), &ProjectSettings::globalize_path);
@@ -1201,10 +1226,16 @@ ProjectSettings::ProjectSettings() {
 	GLOBAL_DEF_BASIC("display/window/size/viewport_height", 648);
 	custom_prop_info["display/window/size/viewport_height"] = PropertyInfo(Variant::INT, "display/window/size/viewport_height", PROPERTY_HINT_RANGE, "0,4320,1,or_greater"); // 8K resolution
 
+	GLOBAL_DEF_BASIC("display/window/size/mode", 0);
+	custom_prop_info["display/window/size/mode"] = PropertyInfo(Variant::INT, "display/window/size/mode", PROPERTY_HINT_ENUM, "Windowed,Minimized,Maximized,Fullscreen,Exclusive Fullscreen");
+
 	GLOBAL_DEF_BASIC("display/window/size/resizable", true);
 	GLOBAL_DEF_BASIC("display/window/size/borderless", false);
-	GLOBAL_DEF_BASIC("display/window/size/fullscreen", false);
 	GLOBAL_DEF("display/window/size/always_on_top", false);
+	GLOBAL_DEF("display/window/size/transparent", false);
+	GLOBAL_DEF("display/window/size/extend_to_title", false);
+	GLOBAL_DEF("display/window/size/no_focus", false);
+
 	GLOBAL_DEF("display/window/size/window_width_override", 0);
 	custom_prop_info["display/window/size/window_width_override"] = PropertyInfo(Variant::INT, "display/window/size/window_width_override", PROPERTY_HINT_RANGE, "0,7680,1,or_greater"); // 8K resolution
 	GLOBAL_DEF("display/window/size/window_height_override", 0);

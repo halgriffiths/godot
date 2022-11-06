@@ -32,7 +32,7 @@
 		<method name="get_play_area" qualifiers="const">
 			<return type="PackedVector3Array" />
 			<description>
-				Returns an array of vectors that denotes the physical play area mapped to the virtual space around the [XROrigin3D] point. The points form a convex polygon that can be used to react to or visualise the play area. This returns an empty array if this feature is not supported or if the information is not yet available.
+				Returns an array of vectors that denotes the physical play area mapped to the virtual space around the [XROrigin3D] point. The points form a convex polygon that can be used to react to or visualize the play area. This returns an empty array if this feature is not supported or if the information is not yet available.
 			</description>
 		</method>
 		<method name="get_render_target_size">
@@ -66,7 +66,19 @@
 		<method name="is_initialized" qualifiers="const">
 			<return type="bool" />
 			<description>
-				Is [code]true[/code] if this interface has been initialised.
+				Is [code]true[/code] if this interface has been initialized.
+			</description>
+		</method>
+		<method name="is_passthrough_enabled">
+			<return type="bool" />
+			<description>
+				Is [code]true[/code] if passthrough is enabled.
+			</description>
+		</method>
+		<method name="is_passthrough_supported">
+			<return type="bool" />
+			<description>
+				Is [code]true[/code] if this interface supports passthrough.
 			</description>
 		</method>
 		<method name="set_play_area_mode">
@@ -74,6 +86,19 @@
 			<param index="0" name="mode" type="int" enum="XRInterface.PlayAreaMode" />
 			<description>
 				Sets the active play area mode, will return [code]false[/code] if the mode can't be used with this interface.
+			</description>
+		</method>
+		<method name="start_passthrough">
+			<return type="bool" />
+			<description>
+				Starts passthrough, will return [code]false[/code] if passthrough couldn't be started.
+				[b]Note:[/b] The viewport used for XR must have a transparent background, otherwise passthrough may not properly render.
+			</description>
+		</method>
+		<method name="stop_passthrough">
+			<return type="void" />
+			<description>
+				Stops passthrough.
 			</description>
 		</method>
 		<method name="supports_play_area_mode">

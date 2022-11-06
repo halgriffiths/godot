@@ -134,14 +134,25 @@ String OS_MacOS::get_name() const {
 	return "macOS";
 }
 
+String OS_MacOS::get_distribution_name() const {
+	return get_name();
+}
+
+String OS_MacOS::get_version() const {
+	NSOperatingSystemVersion ver = [NSProcessInfo processInfo].operatingSystemVersion;
+	return vformat("%d.%d.%d", (int64_t)ver.majorVersion, (int64_t)ver.minorVersion, (int64_t)ver.patchVersion);
+}
+
 void OS_MacOS::alert(const String &p_alert, const String &p_title) {
 	NSAlert *window = [[NSAlert alloc] init];
 	NSString *ns_title = [NSString stringWithUTF8String:p_title.utf8().get_data()];
 	NSString *ns_alert = [NSString stringWithUTF8String:p_alert.utf8().get_data()];
 
+	NSTextField *text_field = [NSTextField labelWithString:ns_alert];
+	[text_field setAlignment:NSTextAlignmentCenter];
 	[window addButtonWithTitle:@"OK"];
 	[window setMessageText:ns_title];
-	[window setInformativeText:ns_alert];
+	[window setAccessoryView:text_field];
 	[window setAlertStyle:NSAlertStyleWarning];
 
 	id key_window = [[NSApplication sharedApplication] keyWindow];
@@ -488,7 +499,14 @@ String OS_MacOS::get_unique_id() const {
 }
 
 bool OS_MacOS::_check_internal_feature_support(const String &p_feature) {
-	return p_feature == "pc";
+	if (p_feature == "system_fonts") {
+		return true;
+	}
+	if (p_feature == "pc") {
+		return true;
+	}
+
+	return false;
 }
 
 void OS_MacOS::disable_crash_handler() {

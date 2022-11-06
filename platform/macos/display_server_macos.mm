@@ -30,6 +30,7 @@
 
 #include "display_server_macos.h"
 
+#include "godot_button_view.h"
 #include "godot_content_view.h"
 #include "godot_menu_delegate.h"
 #include "godot_menu_item.h"
@@ -564,11 +565,11 @@ void DisplayServerMacOS::menu_callback(id p_sender) {
 		}
 
 		if (value->callback != Callable()) {
-			Variant tag = value->meta;
-			Variant *tagp = &tag;
-			Variant ret;
-			Callable::CallError ce;
-			value->callback.callp((const Variant **)&tagp, 1, ret, ce);
+			MenuCall mc;
+			mc.tag = value->meta;
+			mc.callback = value->callback;
+			deferred_menu_calls.push_back(mc);
+			// Do not run callback from here! If it is opening a new window or calling process_events, it will corrupt OS event queue and crash.
 		}
 	}
 }
@@ -585,7 +586,7 @@ void DisplayServerMacOS::send_event(NSEvent *p_event) {
 	// Special case handling of command-period, which is traditionally a special
 	// shortcut in macOS and doesn't arrive at our regular keyDown handler.
 	if ([p_event type] == NSEventTypeKeyDown) {
-		if (([p_event modifierFlags] & NSEventModifierFlagCommand) && [p_event keyCode] == 0x2f) {
+		if ((([p_event modifierFlags] & NSEventModifierFlagDeviceIndependentFlagsMask) == NSEventModifierFlagCommand) && [p_event keyCode] == 0x2f) {
 			Ref<InputEventKey> k;
 			k.instantiate();
 
@@ -2178,7 +2179,7 @@ void DisplayServerMacOS::screen_set_keep_on(bool p_enable) {
 	}
 
 	if (p_enable) {
-		String app_name_string = ProjectSettings::get_singleton()->get("application/config/name");
+		String app_name_string = GLOBAL_GET("application/config/name");
 		NSString *name = [NSString stringWithUTF8String:(app_name_string.is_empty() ? "Godot Engine" : app_name_string.utf8().get_data())];
 		NSString *reason = @"Godot Engine running with display/window/energy_saving/keep_screen_on = true";
 		IOPMAssertionCreateWithDescription(kIOPMAssertPreventUserIdleDisplaySleep, (__bridge CFStringRef)name, (__bridge CFStringRef)reason, (__bridge CFStringRef)reason, nullptr, 0, nullptr, &screen_keep_on_assertion);
@@ -2212,7 +2213,9 @@ void DisplayServerMacOS::show_window(WindowID p_id) {
 	WindowData &wd = windows[p_id];
 
 	popup_open(p_id);
-	if (wd.no_focus || wd.is_popup) {
+	if ([wd.window_object isMiniaturized]) {
+		return;
+	} else if (wd.no_focus || wd.is_popup) {
 		[wd.window_object orderFront:nil];
 	} else {
 		[wd.window_object makeKeyAndOrderFront:nil];
@@ -2369,6 +2372,10 @@ void DisplayServerMacOS::window_set_position(const Point2i &p_position, WindowID
 	ERR_FAIL_COND(!windows.has(p_window));
 	WindowData &wd = windows[p_window];
 
+	if ([wd.window_object isZoomed]) {
+		return;
+	}
+
 	Point2i position = p_position;
 	// OS X native y-coordinate relative to _get_screens_origin() is negative,
 	// Godot passes a positive value.
@@ -2492,6 +2499,10 @@ void DisplayServerMacOS::window_set_size(const Size2i p_size, WindowID p_window)
 
 	ERR_FAIL_COND(!windows.has(p_window));
 	WindowData &wd = windows[p_window];
+
+	if ([wd.window_object isZoomed]) {
+		return;
+	}
 
 	Size2i size = p_size / screen_get_max_scale();
 
@@ -2639,27 +2650,67 @@ bool DisplayServerMacOS::window_minimize_on_title_dbl_click() const {
 	return false;
 }
 
-Vector2i DisplayServerMacOS::window_get_safe_title_margins(WindowID p_window) const {
+void DisplayServerMacOS::window_set_window_buttons_offset(const Vector2i &p_offset, WindowID p_window) {
 	_THREAD_SAFE_METHOD_
 
-	ERR_FAIL_COND_V(!windows.has(p_window), Vector2i());
+	ERR_FAIL_COND(!windows.has(p_window));
+	WindowData &wd = windows[p_window];
+	float scale = screen_get_max_scale();
+	wd.wb_offset = p_offset / scale;
+	wd.wb_offset.x = MAX(wd.wb_offset.x, 12);
+	wd.wb_offset.y = MAX(wd.wb_offset.y, 12);
+	if (wd.window_button_view) {
+		[wd.window_button_view setOffset:NSMakePoint(wd.wb_offset.x, wd.wb_offset.y)];
+	}
+}
+
+Vector3i DisplayServerMacOS::window_get_safe_title_margins(WindowID p_window) const {
+	_THREAD_SAFE_METHOD_
+
+	ERR_FAIL_COND_V(!windows.has(p_window), Vector3i());
 	const WindowData &wd = windows[p_window];
 
-	float max_x = 0.f;
-	NSButton *cb = [wd.window_object standardWindowButton:NSWindowCloseButton];
-	if (cb) {
-		max_x = MAX(max_x, [cb frame].origin.x + [cb frame].size.width);
-	}
-	NSButton *mb = [wd.window_object standardWindowButton:NSWindowMiniaturizeButton];
-	if (mb) {
-		max_x = MAX(max_x, [mb frame].origin.x + [mb frame].size.width);
-	}
-	NSButton *zb = [wd.window_object standardWindowButton:NSWindowZoomButton];
-	if (zb) {
-		max_x = MAX(max_x, [zb frame].origin.x + [zb frame].size.width);
+	if (!wd.window_button_view) {
+		return Vector3i();
 	}
 
-	return Vector2i(max_x * screen_get_max_scale(), 0);
+	float scale = screen_get_max_scale();
+	float max_x = [wd.window_button_view getOffset].x + [wd.window_button_view frame].size.width;
+	float max_y = [wd.window_button_view getOffset].y + [wd.window_button_view frame].size.height;
+
+	if ([wd.window_object windowTitlebarLayoutDirection] == NSUserInterfaceLayoutDirectionRightToLeft) {
+		return Vector3i(0, max_x * scale, max_y * scale);
+	} else {
+		return Vector3i(max_x * scale, 0, max_y * scale);
+	}
+}
+
+void DisplayServerMacOS::window_set_custom_window_buttons(WindowData &p_wd, bool p_enabled) {
+	if (p_wd.window_button_view) {
+		[p_wd.window_button_view removeFromSuperview];
+		p_wd.window_button_view = nil;
+	}
+	if (p_enabled) {
+		float cb_frame = NSMinX([[p_wd.window_object standardWindowButton:NSWindowCloseButton] frame]);
+		float mb_frame = NSMinX([[p_wd.window_object standardWindowButton:NSWindowMiniaturizeButton] frame]);
+		bool is_rtl = ([p_wd.window_object windowTitlebarLayoutDirection] == NSUserInterfaceLayoutDirectionRightToLeft);
+
+		float window_buttons_spacing = (is_rtl) ? (cb_frame - mb_frame) : (mb_frame - cb_frame);
+
+		[p_wd.window_object setTitleVisibility:NSWindowTitleHidden];
+		[[p_wd.window_object standardWindowButton:NSWindowZoomButton] setHidden:YES];
+		[[p_wd.window_object standardWindowButton:NSWindowMiniaturizeButton] setHidden:YES];
+		[[p_wd.window_object standardWindowButton:NSWindowCloseButton] setHidden:YES];
+
+		p_wd.window_button_view = [[GodotButtonView alloc] initWithFrame:NSZeroRect];
+		[p_wd.window_button_view initButtons:window_buttons_spacing offset:NSMakePoint(p_wd.wb_offset.x, p_wd.wb_offset.y) rtl:is_rtl];
+		[p_wd.window_view addSubview:p_wd.window_button_view];
+	} else {
+		[p_wd.window_object setTitleVisibility:NSWindowTitleVisible];
+		[[p_wd.window_object standardWindowButton:NSWindowZoomButton] setHidden:NO];
+		[[p_wd.window_object standardWindowButton:NSWindowMiniaturizeButton] setHidden:NO];
+		[[p_wd.window_object standardWindowButton:NSWindowCloseButton] setHidden:NO];
+	}
 }
 
 void DisplayServerMacOS::window_set_flag(WindowFlags p_flag, bool p_enabled, WindowID p_window) {
@@ -2684,14 +2735,21 @@ void DisplayServerMacOS::window_set_flag(WindowFlags p_flag, bool p_enabled, Win
 			NSRect rect = [wd.window_object frame];
 			if (p_enabled) {
 				[wd.window_object setTitlebarAppearsTransparent:YES];
-				[wd.window_object setTitleVisibility:NSWindowTitleHidden];
 				[wd.window_object setStyleMask:[wd.window_object styleMask] | NSWindowStyleMaskFullSizeContentView];
+
+				if (!wd.fullscreen) {
+					window_set_custom_window_buttons(wd, true);
+				}
 			} else {
 				[wd.window_object setTitlebarAppearsTransparent:NO];
-				[wd.window_object setTitleVisibility:NSWindowTitleVisible];
 				[wd.window_object setStyleMask:[wd.window_object styleMask] & ~NSWindowStyleMaskFullSizeContentView];
+
+				if (!wd.fullscreen) {
+					window_set_custom_window_buttons(wd, false);
+				}
 			}
 			[wd.window_object setFrame:rect display:YES];
+			send_window_event(wd, DisplayServerMacOS::WINDOW_EVENT_TITLEBAR_CHANGE);
 		} break;
 		case WINDOW_FLAG_BORDERLESS: {
 			// OrderOut prevents a lose focus bug with the window.
@@ -2711,7 +2769,9 @@ void DisplayServerMacOS::window_set_flag(WindowFlags p_flag, bool p_enabled, Win
 			}
 			_update_window_style(wd);
 			if ([wd.window_object isVisible]) {
-				if (wd.no_focus || wd.is_popup) {
+				if ([wd.window_object isMiniaturized]) {
+					return;
+				} else if (wd.no_focus || wd.is_popup) {
 					[wd.window_object orderFront:nil];
 				} else {
 					[wd.window_object makeKeyAndOrderFront:nil];
@@ -3228,6 +3288,16 @@ void DisplayServerMacOS::process_events() {
 		[NSApp sendEvent:event];
 	}
 
+	// Process "menu_callback"s.
+	for (MenuCall &E : deferred_menu_calls) {
+		Variant tag = E.tag;
+		Variant *tagp = &tag;
+		Variant ret;
+		Callable::CallError ce;
+		E.callback.callp((const Variant **)&tagp, 1, ret, ce);
+	}
+	deferred_menu_calls.clear();
+
 	if (!drop_events) {
 		_process_key_events();
 		Input::get_singleton()->flush_buffered_events();
@@ -3335,10 +3405,29 @@ void DisplayServerMacOS::set_icon(const Ref<Image> &p_icon) {
 	[NSApp setApplicationIconImage:nsimg];
 }
 
-DisplayServer *DisplayServerMacOS::create_func(const String &p_rendering_driver, WindowMode p_mode, VSyncMode p_vsync_mode, uint32_t p_flags, const Vector2i &p_resolution, Error &r_error) {
-	DisplayServer *ds = memnew(DisplayServerMacOS(p_rendering_driver, p_mode, p_vsync_mode, p_flags, p_resolution, r_error));
+DisplayServer *DisplayServerMacOS::create_func(const String &p_rendering_driver, WindowMode p_mode, VSyncMode p_vsync_mode, uint32_t p_flags, const Vector2i *p_position, const Vector2i &p_resolution, Error &r_error) {
+	DisplayServer *ds = memnew(DisplayServerMacOS(p_rendering_driver, p_mode, p_vsync_mode, p_flags, p_position, p_resolution, r_error));
 	if (r_error != OK) {
-		OS::get_singleton()->alert("Your video card driver does not support any of the supported Vulkan or OpenGL versions.", "Unable to initialize Video driver");
+		if (p_rendering_driver == "vulkan") {
+			String executable_command;
+			if (OS::get_singleton()->get_bundle_resource_dir() == OS::get_singleton()->get_executable_path().get_base_dir()) {
+				executable_command = vformat("%s --rendering-driver opengl3", OS::get_singleton()->get_executable_path());
+			} else {
+				executable_command = vformat("open %s --args --rendering-driver opengl3", OS::get_singleton()->get_bundle_resource_dir().path_join("../..").simplify_path());
+			}
+			OS::get_singleton()->alert("Your video card driver does not support the selected Vulkan version.\n"
+									   "Please try updating your GPU driver or try using the OpenGL 3 driver.\n"
+									   "You can enable the OpenGL 3 driver by starting the engine from the\n"
+									   "command line with the command: '" +
+							executable_command + "'.\n"
+												 "If you have updated your graphics drivers recently, try rebooting.",
+					"Unable to initialize Video driver");
+		} else {
+			OS::get_singleton()->alert("Your video card driver does not support the selected OpenGL version.\n"
+									   "Please try updating your GPU driver.\n"
+									   "If you have updated your graphics drivers recently, try rebooting.",
+					"Unable to initialize Video driver");
+		}
 	}
 	return ds;
 }
@@ -3486,7 +3575,7 @@ bool DisplayServerMacOS::mouse_process_popups(bool p_close) {
 	return closed;
 }
 
-DisplayServerMacOS::DisplayServerMacOS(const String &p_rendering_driver, WindowMode p_mode, VSyncMode p_vsync_mode, uint32_t p_flags, const Vector2i &p_resolution, Error &r_error) {
+DisplayServerMacOS::DisplayServerMacOS(const String &p_rendering_driver, WindowMode p_mode, VSyncMode p_vsync_mode, uint32_t p_flags, const Vector2i *p_position, const Vector2i &p_resolution, Error &r_error) {
 	Input::get_singleton()->set_event_dispatch_function(_dispatch_input_events);
 
 	r_error = OK;
@@ -3595,6 +3684,11 @@ DisplayServerMacOS::DisplayServerMacOS(const String &p_rendering_driver, WindowM
 	Point2i window_position(
 			screen_get_position(0).x + (screen_get_size(0).width - p_resolution.width) / 2,
 			screen_get_position(0).y + (screen_get_size(0).height - p_resolution.height) / 2);
+
+	if (p_position != nullptr) {
+		window_position = *p_position;
+	}
+
 	WindowID main_window = _create_window(p_mode, p_vsync_mode, Rect2i(window_position, p_resolution));
 	ERR_FAIL_COND(main_window == INVALID_WINDOW_ID);
 	for (int i = 0; i < WINDOW_FLAG_MAX; i++) {

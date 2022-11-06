@@ -189,7 +189,10 @@ void PhysicsServer2DExtension::_bind_methods() {
 	GDVIRTUAL_BIND(_area_get_transform, "area");
 
 	GDVIRTUAL_BIND(_area_set_collision_layer, "area", "layer");
+	GDVIRTUAL_BIND(_area_get_collision_layer, "area");
+
 	GDVIRTUAL_BIND(_area_set_collision_mask, "area", "mask");
+	GDVIRTUAL_BIND(_area_get_collision_mask, "area");
 
 	GDVIRTUAL_BIND(_area_set_monitorable, "area", "monitorable");
 	GDVIRTUAL_BIND(_area_set_pickable, "area", "pickable");
@@ -280,7 +283,7 @@ void PhysicsServer2DExtension::_bind_methods() {
 	GDVIRTUAL_BIND(_body_set_omit_force_integration, "body", "enable");
 	GDVIRTUAL_BIND(_body_is_omitting_force_integration, "body");
 
-	GDVIRTUAL_BIND(_body_set_state_sync_callback, "body", "callback");
+	GDVIRTUAL_BIND(_body_set_state_sync_callback, "body", "callable");
 	GDVIRTUAL_BIND(_body_set_force_integration_callback, "body", "callable", "userdata");
 
 	GDVIRTUAL_BIND(_body_collide_shape, "body", "body_shape", "shape", "shape_xform", "motion", "results", "result_max", "result_count");

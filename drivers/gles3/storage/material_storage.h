@@ -494,7 +494,7 @@ public:
 	static _FORCE_INLINE_ void store_camera(const Projection &p_mtx, float *p_array) {
 		for (int i = 0; i < 4; i++) {
 			for (int j = 0; j < 4; j++) {
-				p_array[i * 4 + j] = p_mtx.matrix[i][j];
+				p_array[i * 4 + j] = p_mtx.columns[i][j];
 			}
 		}
 	}
@@ -530,7 +530,7 @@ public:
 
 	virtual int32_t global_shader_parameters_instance_allocate(RID p_instance) override;
 	virtual void global_shader_parameters_instance_free(RID p_instance) override;
-	virtual void global_shader_parameters_instance_update(RID p_instance, int p_index, const Variant &p_value) override;
+	virtual void global_shader_parameters_instance_update(RID p_instance, int p_index, const Variant &p_value, int p_flags_count = 0) override;
 
 	GLuint global_shader_parameters_get_uniform_buffer() const;
 

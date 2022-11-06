@@ -38,6 +38,7 @@ const int ERROR_CODE = 77;
 
 #include "modules/regex/regex.h"
 
+#include "core/io/dir_access.h"
 #include "core/os/time.h"
 #include "core/templates/hash_map.h"
 #include "core/templates/list.h"
@@ -216,6 +217,7 @@ static const char *gdscript_function_renames[][2] = {
 	{ "_get_configuration_warning", "_get_configuration_warnings" }, // Node
 	{ "_set_current", "set_current" }, // Camera2D
 	{ "_set_editor_description", "set_editor_description" }, // Node
+	{ "_set_playing", "set_playing" }, // AnimatedSprite3D
 	{ "_toplevel_raise_self", "_top_level_raise_self" }, // CanvasItem
 	{ "_update_wrap_at", "_update_wrap_at_column" }, // TextEdit
 	{ "add_animation", "add_animation_library" }, // AnimationPlayer
@@ -228,8 +230,10 @@ static const char *gdscript_function_renames[][2] = {
 	{ "add_force", "apply_force" }, //RigidBody2D
 	{ "add_icon_override", "add_theme_icon_override" }, // Control
 	{ "add_scene_import_plugin", "add_scene_format_importer_plugin" }, //EditorPlugin
+	{ "add_spatial_gizmo_plugin", "add_node_3d_gizmo_plugin" }, // EditorPlugin
 	{ "add_stylebox_override", "add_theme_stylebox_override" }, // Control
 	{ "add_torque", "apply_torque" }, //RigidBody2D
+	{ "agent_set_neighbor_dist", "agent_set_neighbor_distance" }, // NavigationServer2D, NavigationServer3D
 	{ "apply_changes", "_apply_changes" }, // EditorPlugin
 	{ "body_add_force", "body_apply_force" }, // PhysicsServer2D
 	{ "body_add_torque", "body_apply_torque" }, // PhysicsServer2D
@@ -280,7 +284,7 @@ static const char *gdscript_function_renames[][2] = {
 	{ "get_applied_torque", "get_constant_torque" }, //RigidBody2D
 	{ "get_audio_bus", "get_audio_bus_name" }, // Area3D
 	{ "get_bound_child_nodes_to_bone", "get_bone_children" }, // Skeleton3D
-	{ "get_camera", "get_camera_3d" }, // Viewport -> this is also convertable to get_camera_2d, broke GLTFNode
+	{ "get_camera", "get_camera_3d" }, // Viewport -> this is also convertible to get_camera_2d, broke GLTFNode
 	{ "get_cancel", "get_cancel_button" }, // ConfirmationDialog
 	{ "get_caption", "_get_caption" }, // AnimationNode
 	{ "get_cast_to", "get_target_position" }, // RayCast2D, RayCast3D
@@ -298,6 +302,7 @@ static const char *gdscript_function_renames[][2] = {
 	{ "get_cull_mask_bit", "get_cull_mask_value" }, // Camera3D
 	{ "get_cursor_position", "get_caret_column" }, // LineEdit
 	{ "get_d", "get_distance" }, // LineShape2D
+	{ "get_depth_bias_enable", "get_depth_bias_enabled" }, // RDPipelineRasterizationState
 	{ "get_drag_data", "_get_drag_data" }, // Control
 	{ "get_drag_data_fw", "_get_drag_data_fw" }, // ScriptEditor
 	{ "get_editor_viewport", "get_editor_main_screen" }, // EditorPlugin
@@ -306,6 +311,7 @@ static const char *gdscript_function_renames[][2] = {
 	{ "get_error_string", "get_error_message" }, // JSON
 	{ "get_filename", "get_scene_file_path" }, // Node, WARNING, this may be used in a lot of other places
 	{ "get_focus_neighbour", "get_focus_neighbor" }, // Control
+	{ "get_follow_smoothing", "get_position_smoothing_speed" }, // Camera2D
 	{ "get_font_types", "get_font_type_list" }, // Theme
 	{ "get_frame_color", "get_color" }, // ColorRect
 	{ "get_global_rate_scale", "get_playback_speed_scale" }, // AudioServer
@@ -331,6 +337,7 @@ static const char *gdscript_function_renames[][2] = {
 	{ "get_metakey", "is_meta_pressed" }, // InputEventWithModifiers
 	{ "get_mid_height", "get_height" }, // CapsuleMesh
 	{ "get_motion_remainder", "get_remainder" }, // PhysicsTestMotionResult2D
+	{ "get_neighbor_dist", "get_neighbor_distance" }, // NavigationAgent2D, NavigationAgent3D
 	{ "get_network_connected_peers", "get_peers" }, // Multiplayer API
 	{ "get_network_master", "get_multiplayer_authority" }, // Node
 	{ "get_network_peer", "get_multiplayer_peer" }, // Multiplayer API
@@ -353,6 +360,7 @@ static const char *gdscript_function_renames[][2] = {
 	{ "get_render_targetsize", "get_render_target_size" }, // XRInterface
 	{ "get_resource_type", "_get_resource_type" }, // ResourceFormatLoader
 	{ "get_result", "get_data" }, //JSON
+	{ "get_reverb_bus", "set_reverb_bus_name" }, // Area3D
 	{ "get_rpc_sender_id", "get_remote_sender_id" }, // Multiplayer API
 	{ "get_save_extension", "_get_save_extension" }, // EditorImportPlugin
 	{ "get_scancode", "get_keycode" }, // InputEventKey
@@ -363,6 +371,7 @@ static const char *gdscript_function_renames[][2] = {
 	{ "get_slide_count", "get_slide_collision_count" }, // CharacterBody2D, CharacterBody3D
 	{ "get_slips_on_slope", "get_slide_on_slope" }, // SeparationRayShape2D, SeparationRayShape3D
 	{ "get_space_override_mode", "get_gravity_space_override_mode" }, // Area2D
+	{ "get_spatial_node", "get_node_3d" }, // EditorNode3DGizmo
 	{ "get_speed", "get_velocity" }, // InputEventMouseMotion
 	{ "get_stylebox_types", "get_stylebox_type_list" }, // Theme
 	{ "get_surface_material", "get_surface_override_material" }, // MeshInstance3D broke ImporterMesh
@@ -373,6 +382,7 @@ static const char *gdscript_function_renames[][2] = {
 	{ "get_theme_item_types", "get_theme_item_type_list" }, // Theme
 	{ "get_timer_process_mode", "get_timer_process_callback" }, // Timer
 	{ "get_translation", "get_position" }, // Node3D broke GLTFNode which is used rarely
+	{ "get_unit_db", "get_volume_db" }, // AudioStreamPlayer3D
 	{ "get_unit_offset", "get_progress_ratio" }, // PathFollow2D, PathFollow3D
 	{ "get_use_in_baked_light", "is_baking_navigation" }, // GridMap
 	{ "get_used_cells_by_id", "get_used_cells" }, // TileMap
@@ -410,6 +420,7 @@ static const char *gdscript_function_renames[][2] = {
 	{ "is_commiting_action", "is_committing_action" }, // UndoRedo
 	{ "is_doubleclick", "is_double_click" }, // InputEventMouseButton
 	{ "is_draw_red", "is_draw_warning" }, // EditorProperty
+	{ "is_follow_smoothing_enabled", "is_position_smoothing_enabled" }, // Camera2D
 	{ "is_h_drag_enabled", "is_drag_horizontal_enabled" }, // Camera2D
 	{ "is_handle_highlighted", "_is_handle_highlighted" }, // EditorNode3DGizmo, EditorNode3DGizmoPlugin
 	{ "is_inverting_faces", "get_flip_faces" }, // CSGPrimitive3D
@@ -418,6 +429,7 @@ static const char *gdscript_function_renames[][2] = {
 	{ "is_normalmap", "is_normal_map" }, // NoiseTexture
 	{ "is_refusing_new_network_connections", "is_refusing_new_connections" }, // Multiplayer API
 	{ "is_region", "is_region_enabled" }, // Sprite2D
+	{ "is_rotating", "is_ignoring_rotation" }, // Camera2D
 	{ "is_scancode_unicode", "is_keycode_unicode" }, // OS
 	{ "is_selectable_when_hidden", "_is_selectable_when_hidden" }, // EditorNode3DGizmoPlugin
 	{ "is_set_as_toplevel", "is_set_as_top_level" }, // CanvasItem
@@ -461,6 +473,7 @@ static const char *gdscript_function_renames[][2] = {
 	{ "remove_font_override", "remove_theme_font_override" }, // Control
 	{ "remove_icon_override", "remove_theme_icon_override" }, // Control
 	{ "remove_scene_import_plugin", "remove_scene_format_importer_plugin" }, //EditorPlugin
+	{ "remove_spatial_gizmo_plugin", "remove_node_3d_gizmo_plugin" }, // EditorPlugin
 	{ "remove_stylebox_override", "remove_theme_stylebox_override" }, // Control
 	{ "rename_animation", "rename_animation_library" }, // AnimationPlayer
 	{ "rename_dependencies", "_rename_dependencies" }, // ResourceFormatLoader
@@ -486,13 +499,16 @@ static const char *gdscript_function_renames[][2] = {
 	{ "set_cull_mask_bit", "set_cull_mask_value" }, // Camera3D
 	{ "set_cursor_position", "set_caret_column" }, // LineEdit
 	{ "set_d", "set_distance" }, // WorldMarginShape2D
+	{ "set_depth_bias_enable", "set_depth_bias_enabled" }, // RDPipelineRasterizationState
 	{ "set_doubleclick", "set_double_click" }, // InputEventMouseButton
 	{ "set_draw_red", "set_draw_warning" }, // EditorProperty
+	{ "set_enable_follow_smoothing", "set_position_smoothing_enabled" }, // Camera2D
 	{ "set_enabled_focus_mode", "set_focus_mode" }, // BaseButton
 	{ "set_endian_swap", "set_big_endian" }, // File
 	{ "set_expand_to_text_length", "set_expand_to_text_length_enabled" }, // LineEdit
 	{ "set_filename", "set_scene_file_path" }, // Node, WARNING, this may be used in a lot of other places
 	{ "set_focus_neighbour", "set_focus_neighbor" }, // Control
+	{ "set_follow_smoothing", "set_position_smoothing_speed" }, // Camera2D
 	{ "set_frame_color", "set_color" }, // ColorRect
 	{ "set_global_rate_scale", "set_playback_speed_scale" }, // AudioServer
 	{ "set_gravity_distance_scale", "set_gravity_point_distance_scale" }, // Area2D
@@ -510,14 +526,17 @@ static const char *gdscript_function_renames[][2] = {
 	{ "set_max_atlas_size", "set_max_texture_size" }, // LightmapGI
 	{ "set_metakey", "set_meta_pressed" }, // InputEventWithModifiers
 	{ "set_mid_height", "set_height" }, // CapsuleMesh
+	{ "set_neighbor_dist", "set_neighbor_distance" }, // NavigationAgent2D, NavigationAgent3D
 	{ "set_network_master", "set_multiplayer_authority" }, // Node
 	{ "set_network_peer", "set_multiplayer_peer" }, // Multiplayer API
 	{ "set_oneshot", "set_one_shot" }, // AnimatedTexture
 	{ "set_pause_mode", "set_process_mode" }, // Node
 	{ "set_physical_scancode", "set_physical_keycode" }, // InputEventKey
+	{ "set_proximity_fade", "set_proximity_fade_enabled" }, // Material
 	{ "set_refuse_new_network_connections", "set_refuse_new_connections" }, // Multiplayer API
 	{ "set_region", "set_region_enabled" }, // Sprite2D, Sprite broke AtlasTexture
 	{ "set_region_filter_clip", "set_region_filter_clip_enabled" }, // Sprite2D
+	{ "set_reverb_bus", "set_reverb_bus_name" }, // Area3D
 	{ "set_rotate", "set_rotates" }, // PathFollow2D
 	{ "set_scancode", "set_keycode" }, // InputEventKey
 	{ "set_shift", "set_shift_pressed" }, // InputEventWithModifiers
@@ -526,6 +545,7 @@ static const char *gdscript_function_renames[][2] = {
 	{ "set_slips_on_slope", "set_slide_on_slope" }, // SeparationRayShape2D, SeparationRayShape3D
 	{ "set_sort_enabled", "set_y_sort_enabled" }, // Node2D
 	{ "set_space_override_mode", "set_gravity_space_override_mode" }, // Area2D
+	{ "set_spatial_node", "set_node_3d" }, // EditorNode3DGizmo
 	{ "set_speed", "set_velocity" }, // InputEventMouseMotion
 	{ "set_ssao_edge_sharpness", "set_ssao_sharpness" }, // Environment
 	{ "set_surface_material", "set_surface_override_material" }, // MeshInstance3D broke ImporterMesh
@@ -534,6 +554,7 @@ static const char *gdscript_function_renames[][2] = {
 	{ "set_text_align", "set_text_alignment" }, // Button
 	{ "set_timer_process_mode", "set_timer_process_callback" }, // Timer
 	{ "set_translation", "set_position" }, // Node3D - this broke GLTFNode which is used rarely
+	{ "set_unit_db", "set_volume_db" }, // AudioStreamPlayer3D
 	{ "set_unit_offset", "set_progress_ratio" }, // PathFollow2D, PathFollow3D
 	{ "set_uv2", "surface_set_uv2" }, // ImmediateMesh broke Surffacetool
 	{ "set_v_drag_enabled", "set_drag_vertical_enabled" }, // Camera2D
@@ -645,11 +666,13 @@ static const char *csharp_function_renames[][2] = {
 	// { "SetVOffset", "SetDragVerticalOffset" }, // Camera2D broke Camera3D, PathFollow3D, PathFollow2D
 	// {"GetPoints","GetPointsId"},// Astar, broke Line2D, Convexpolygonshape
 	// {"GetVScroll","GetVScrollBar"},//ItemList, broke TextView
+	{ "AddSpatialGizmoPlugin", "AddNode3dGizmoPlugin" }, // EditorPlugin
 	{ "RenderingServer", "GetTabAlignment" }, // Tab
 	{ "_AboutToShow", "_AboutToPopup" }, // ColorPickerButton
 	{ "_GetConfigurationWarning", "_GetConfigurationWarnings" }, // Node
 	{ "_SetCurrent", "SetCurrent" }, // Camera2D
 	{ "_SetEditorDescription", "SetEditorDescription" }, // Node
+	{ "_SetPlaying", "SetPlaying" }, // AnimatedSprite3D
 	{ "_ToplevelRaiseSelf", "_TopLevelRaiseSelf" }, // CanvasItem
 	{ "_UpdateWrapAt", "_UpdateWrapAtColumn" }, // TextEdit
 	{ "AddAnimation", "AddAnimationLibrary" }, // AnimationPlayer
@@ -664,6 +687,7 @@ static const char *csharp_function_renames[][2] = {
 	{ "AddSceneImportPlugin", "AddSceneFormatImporterPlugin" }, //EditorPlugin
 	{ "AddStyleboxOverride", "AddThemeStyleboxOverride" }, // Control
 	{ "AddTorque", "AddConstantTorque" }, //RigidBody2D
+	{ "AgentSetNeighborDist", "AgentSetNeighborDistance" }, // NavigationServer2D, NavigationServer3D
 	{ "BindChildNodeToBone", "SetBoneChildren" }, // Skeleton3D
 	{ "BumpmapToNormalmap", "BumpMapToNormalMap" }, // Image
 	{ "CanBeHidden", "_CanBeHidden" }, // EditorNode3DGizmoPlugin
@@ -708,7 +732,7 @@ static const char *csharp_function_renames[][2] = {
 	{ "GetAppliedTorque", "GetConstantTorque" }, //RigidBody2D
 	{ "GetAudioBus", "GetAudioBusName" }, // Area3D
 	{ "GetBoundChildNodesToBone", "GetBoneChildren" }, // Skeleton3D
-	{ "GetCamera", "GetCamera3d" }, // Viewport -> this is also convertable to getCamera2d, broke GLTFNode
+	{ "GetCamera", "GetCamera3d" }, // Viewport -> this is also convertible to getCamera2d, broke GLTFNode
 	{ "GetCancel", "GetCancelButton" }, // ConfirmationDialog
 	{ "GetCaption", "_GetCaption" }, // AnimationNode
 	{ "GetCastTo", "GetTargetPosition" }, // RayCast2D, RayCast3D
@@ -726,12 +750,14 @@ static const char *csharp_function_renames[][2] = {
 	{ "GetCullMaskBit", "GetCullMaskValue" }, // Camera3D
 	{ "GetCursorPosition", "GetCaretColumn" }, // LineEdit
 	{ "GetD", "GetDistance" }, // LineShape2D
+	{ "GetDepthBiasEnable", "GetDepthBiasEnabled" }, // RDPipelineRasterizationState
 	{ "GetDragDataFw", "_GetDragDataFw" }, // ScriptEditor
 	{ "GetEditorViewport", "GetViewport" }, // EditorPlugin
 	{ "GetEnabledFocusMode", "GetFocusMode" }, // BaseButton
 	{ "GetEndianSwap", "IsBigEndian" }, // File
 	{ "GetErrorString", "GetErrorMessage" }, // JSON
 	{ "GetFocusNeighbour", "GetFocusNeighbor" }, // Control
+	{ "GetFollowSmoothing", "GetFollowSmoothingSpeed" }, // Camera2D
 	{ "GetFontTypes", "GetFontTypeList" }, // Theme
 	{ "GetFrameColor", "GetColor" }, // ColorRect
 	{ "GetGlobalRateScale", "GetPlaybackSpeedScale" }, // AudioServer
@@ -757,6 +783,7 @@ static const char *csharp_function_renames[][2] = {
 	{ "GetMetakey", "IsMetaPressed" }, // InputEventWithModifiers
 	{ "GetMidHeight", "GetHeight" }, // CapsuleMesh
 	{ "GetMotionRemainder", "GetRemainder" }, // PhysicsTestMotionResult2D
+	{ "GetNeighborDist", "GetNeighborDistance" }, // NavigationAgent2D, NavigationAgent3D
 	{ "GetNetworkConnectedPeers", "GetPeers" }, // Multiplayer API
 	{ "GetNetworkMaster", "GetMultiplayerAuthority" }, // Node
 	{ "GetNetworkPeer", "GetMultiplayerPeer" }, // Multiplayer API
@@ -778,6 +805,7 @@ static const char *csharp_function_renames[][2] = {
 	{ "GetRenderTargetsize", "GetRenderTargetSize" }, // XRInterface
 	{ "GetResourceType", "_GetResourceType" }, // ResourceFormatLoader
 	{ "GetResult", "GetData" }, //JSON
+	{ "GetReverbBus", "GetReverbBusName" }, // Area3D
 	{ "GetRpcSenderId", "GetRemoteSenderId" }, // Multiplayer API
 	{ "GetSaveExtension", "_GetSaveExtension" }, // EditorImportPlugin
 	{ "GetScancode", "GetKeycode" }, // InputEventKey
@@ -787,6 +815,7 @@ static const char *csharp_function_renames[][2] = {
 	{ "GetSizeOverride", "GetSize2dOverride" }, // SubViewport
 	{ "GetSlipsOnSlope", "GetSlideOnSlope" }, // SeparationRayShape2D, SeparationRayShape3D
 	{ "GetSpaceOverrideMode", "GetGravitySpaceOverrideMode" }, // Area2D
+	{ "GetSpatialNode", "GetNode3d" }, // EditorNode3DGizmo
 	{ "GetSpeed", "GetVelocity" }, // InputEventMouseMotion
 	{ "GetStyleboxTypes", "GetStyleboxTypeList" }, // Theme
 	{ "GetSurfaceMaterial", "GetSurfaceOverrideMaterial" }, // MeshInstance3D broke ImporterMesh
@@ -797,6 +826,7 @@ static const char *csharp_function_renames[][2] = {
 	{ "GetThemeItemTypes", "GetThemeItemTypeList" }, // Theme
 	{ "GetTimerProcessMode", "GetTimerProcessCallback" }, // Timer
 	{ "GetTranslation", "GetPosition" }, // Node3D broke GLTFNode which is used rarely
+	{ "GetUnitDb", "GetVolumeDb" }, // AudioStreamPlayer3D
 	{ "GetUnitOffset", "GetProgressRatio" }, // PathFollow2D, PathFollow3D
 	{ "GetUseInBakedLight", "IsBakingNavigation" }, // GridMap
 	{ "GetUsedCellsById", "GetUsedCells" }, // TileMap
@@ -833,6 +863,7 @@ static const char *csharp_function_renames[][2] = {
 	{ "IsAParentOf", "IsAncestorOf" }, // Node
 	{ "IsCommitingAction", "IsCommittingAction" }, // UndoRedo
 	{ "IsDoubleclick", "IsDoubleClick" }, // InputEventMouseButton
+	{ "IsFollowSmoothingEnabled", "IsPositionSmoothingEnabled" }, // Camera2D
 	{ "IsHDragEnabled", "IsDragHorizontalEnabled" }, // Camera2D
 	{ "IsHandleHighlighted", "_IsHandleHighlighted" }, // EditorNode3DGizmo, EditorNode3DGizmoPlugin
 	{ "IsNetworkMaster", "IsMultiplayerAuthority" }, // Node
@@ -840,6 +871,7 @@ static const char *csharp_function_renames[][2] = {
 	{ "IsNormalmap", "IsNormalMap" }, // NoiseTexture
 	{ "IsRefusingNewNetworkConnections", "IsRefusingNewConnections" }, // Multiplayer API
 	{ "IsRegion", "IsRegionEnabled" }, // Sprite2D
+	{ "IsRotating", "IsIgnoringRotation" }, // Camera2D
 	{ "IsScancodeUnicode", "IsKeycodeUnicode" }, // OS
 	{ "IsSelectableWhenHidden", "_IsSelectableWhenHidden" }, // EditorNode3DGizmoPlugin
 	{ "IsSetAsToplevel", "IsSetAsTopLevel" }, // CanvasItem
@@ -880,6 +912,7 @@ static const char *csharp_function_renames[][2] = {
 	{ "RemoveConstantOverride", "RemoveThemeConstantOverride" }, // Control
 	{ "RemoveFontOverride", "RemoveThemeFontOverride" }, // Control
 	{ "RemoveSceneImportPlugin", "RemoveSceneFormatImporterPlugin" }, //EditorPlugin
+	{ "RemoveSpatialGizmoPlugin", "RemoveNode3dGizmoPlugin" }, // EditorPlugin
 	{ "RemoveStyleboxOverride", "RemoveThemeStyleboxOverride" }, // Control
 	{ "RenameAnimation", "RenameAnimationLibrary" }, // AnimationPlayer
 	{ "RenameDependencies", "_RenameDependencies" }, // ResourceFormatLoader
@@ -905,11 +938,14 @@ static const char *csharp_function_renames[][2] = {
 	{ "SetCullMaskBit", "SetCullMaskValue" }, // Camera3D
 	{ "SetCursorPosition", "SetCaretColumn" }, // LineEdit
 	{ "SetD", "SetDistance" }, // WorldMarginShape2D
+	{ "SetDepthBiasEnable", "SetDepthBiasEnabled" }, // RDPipelineRasterizationState
 	{ "SetDoubleclick", "SetDoubleClick" }, // InputEventMouseButton
+	{ "SetEnableFollowSmoothing", "SetFollowSmoothingEnabled" }, // Camera2D
 	{ "SetEnabledFocusMode", "SetFocusMode" }, // BaseButton
 	{ "SetEndianSwap", "SetBigEndian" }, // File
 	{ "SetExpandToTextLength", "SetExpandToTextLengthEnabled" }, // LineEdit
 	{ "SetFocusNeighbour", "SetFocusNeighbor" }, // Control
+	{ "SetFollowSmoothing", "SetFollowSmoothingSpeed" }, // Camera2D
 	{ "SetFrameColor", "SetColor" }, // ColorRect
 	{ "SetGlobalRateScale", "SetPlaybackSpeedScale" }, // AudioServer
 	{ "SetGravityDistanceScale", "SetGravityPointDistanceScale" }, // Area2D
@@ -926,13 +962,16 @@ static const char *csharp_function_renames[][2] = {
 	{ "SetMaxAtlasSize", "SetMaxTextureSize" }, // LightmapGI
 	{ "SetMetakey", "SetMetaPressed" }, // InputEventWithModifiers
 	{ "SetMidHeight", "SetHeight" }, // CapsuleMesh
+	{ "SetNeighborDist", "SetNeighborDistance" }, // NavigationAgent2D, NavigationAgent3D
 	{ "SetNetworkMaster", "SetMultiplayerAuthority" }, // Node
 	{ "SetNetworkPeer", "SetMultiplayerPeer" }, // Multiplayer API
 	{ "SetOneshot", "SetOneShot" }, // AnimatedTexture
 	{ "SetPhysicalScancode", "SetPhysicalKeycode" }, // InputEventKey
+	{ "SetProximityFade", "SetProximityFadeEnabled" }, // Material
 	{ "SetRefuseNewNetworkConnections", "SetRefuseNewConnections" }, // Multiplayer API
 	{ "SetRegion", "SetRegionEnabled" }, // Sprite2D, Sprite broke AtlasTexture
 	{ "SetRegionFilterClip", "SetRegionFilterClipEnabled" }, // Sprite2D
+	{ "SetReverbBus", "SetReverbBusName" }, // Area3D
 	{ "SetRotate", "SetRotates" }, // PathFollow2D
 	{ "SetScancode", "SetKeycode" }, // InputEventKey
 	{ "SetShift", "SetShiftPressed" }, // InputEventWithModifiers
@@ -941,6 +980,7 @@ static const char *csharp_function_renames[][2] = {
 	{ "SetSlipsOnSlope", "SetSlideOnSlope" }, // SeparationRayShape2D, SeparationRayShape3D
 	{ "SetSortEnabled", "SetYSortEnabled" }, // Node2D
 	{ "SetSpaceOverrideMode", "SetGravitySpaceOverrideMode" }, // Area2D
+	{ "SetSpatialNode", "SetNode3d" }, // EditorNode3DGizmo
 	{ "SetSpeed", "SetVelocity" }, // InputEventMouseMotion
 	{ "SetSsaoEdgeSharpness", "SetSsaoSharpness" }, // Environment
 	{ "SetSurfaceMaterial", "SetSurfaceOverrideMaterial" }, // MeshInstance3D broke ImporterMesh
@@ -950,6 +990,7 @@ static const char *csharp_function_renames[][2] = {
 	{ "SetTimerProcessMode", "SetTimerProcessCallback" }, // Timer
 	{ "SetTonemapAutoExposure", "SetTonemapAutoExposureEnabled" }, // Environment
 	{ "SetTranslation", "SetPosition" }, // Node3D - this broke GLTFNode which is used rarely
+	{ "SetUnitDb", "SetVolumeDb" }, // AudioStreamPlayer3D
 	{ "SetUnitOffset", "SetProgressRatio" }, // PathFollow2D, PathFollow3D
 	{ "SetUv2", "SurfaceSetUv2" }, // ImmediateMesh broke Surffacetool
 	{ "SetVDragEnabled", "SetDragVerticalEnabled" }, // Camera2D
@@ -1048,6 +1089,7 @@ static const char *gdscript_properties_renames[][2] = {
 	{ "close_v_ofs", "close_v_offset" }, // Theme
 	{ "commentfocus", "comment_focus" }, // Theme
 	{ "contacts_reported", "max_contacts_reported" }, // RigidBody
+	{ "depth_bias_enable", "depth_bias_enabled" }, // RDPipelineRasterizationState
 	{ "drag_margin_bottom", "drag_bottom_margin" }, // Camera2D
 	{ "drag_margin_h_enabled", "drag_horizontal_enabled" }, // Camera2D
 	{ "drag_margin_left", "drag_left_margin" }, // Camera2D
@@ -1061,6 +1103,7 @@ static const char *gdscript_properties_renames[][2] = {
 	{ "focus_neighbour_left", "focus_neighbor_left" }, // Control
 	{ "focus_neighbour_right", "focus_neighbor_right" }, // Control
 	{ "focus_neighbour_top", "focus_neighbor_top" }, // Control
+	{ "follow_viewport_enable", "follow_viewport_enabled" }, // CanvasItem
 	{ "file_icon_modulate", "file_icon_color" }, // Theme
 	{ "files_disabled", "file_disabled_color" }, // Theme
 	{ "folder_icon_modulate", "folder_icon_color" }, // Theme
@@ -1076,6 +1119,7 @@ static const char *gdscript_properties_renames[][2] = {
 	{ "margin_right", "offset_right" }, // Control broke NinePatchRect, StyleBox
 	{ "margin_top", "offset_top" }, // Control broke NinePatchRect, StyleBox
 	{ "mid_height", "height" }, // CapsuleMesh
+	{ "neighbor_dist", "neighbor_distance" }, // NavigationAgent2D, NavigationAgent3D
 	{ "offset_h", "drag_horizontal_offset" }, // Camera2D
 	{ "offset_v", "drag_vertical_offset" }, // Camera2D
 	{ "off", "unchecked" }, // Theme
@@ -1088,6 +1132,7 @@ static const char *gdscript_properties_renames[][2] = {
 	{ "pause_mode", "process_mode" }, // Node
 	{ "physical_scancode", "physical_keycode" }, // InputEventKey
 	{ "popup_exclusive", "exclusive" }, // Window
+	{ "proximity_fade_enable", "proximity_fade_enabled" }, // Material
 	{ "rect_position", "position" }, // Control
 	{ "rect_global_position", "global_position" }, // Control
 	{ "rect_size", "size" }, // Control
@@ -1098,9 +1143,12 @@ static const char *gdscript_properties_renames[][2] = {
 	{ "rect_clip_content", "clip_contents" }, // Control
 	{ "refuse_new_network_connections", "refuse_new_connections" }, // MultiplayerAPI
 	{ "region_filter_clip", "region_filter_clip_enabled" }, // Sprite2D
+	{ "reverb_bus_enable", "reverb_bus_enabled" }, // Area3D
 	{ "selectedframe", "selected_frame" }, // Theme
 	{ "size_override_stretch", "size_2d_override_stretch" }, // SubViewport
 	{ "slips_on_slope", "slide_on_slope" }, // SeparationRayShape2D
+	{ "smoothing_enabled", "follow_smoothing_enabled" }, // Camera2D
+	{ "smoothing_speed", "position_smoothing_speed" }, // Camera2D
 	{ "ss_reflections_depth_tolerance", "ssr_depth_tolerance" }, // Environment
 	{ "ss_reflections_enabled", "ssr_enabled" }, // Environment
 	{ "ss_reflections_fade_in", "ssr_fade_in" }, // Environment
@@ -1112,6 +1160,7 @@ static const char *gdscript_properties_renames[][2] = {
 	{ "table_hseparation", "table_h_separation" }, // Theme
 	{ "table_vseparation", "table_v_separation" }, // Theme
 	{ "translation", "position" }, // Node3D - broke GLTFNode
+	{ "unit_db", "volume_db" }, // AudioStreamPlayer3D
 	{ "unit_offset", "progress_ratio" }, // PathFollow2D, PathFollow3D
 	{ "vseparation", "v_separation" }, // Theme
 
@@ -1151,6 +1200,7 @@ static const char *csharp_properties_renames[][2] = {
 	{ "CloseHOfs", "CloseHOffset" }, // Theme
 	{ "CloseVOfs", "CloseVOffset" }, // Theme
 	{ "Commentfocus", "CommentFocus" }, // Theme
+	{ "DepthBiasEnable", "DepthBiasEnabled" }, // RDPipelineRasterizationState
 	{ "DragMarginBottom", "DragBottomMargin" }, // Camera2D
 	{ "DragMarginHEnabled", "DragHorizontalEnabled" }, // Camera2D
 	{ "DragMarginLeft", "DragLeftMargin" }, // Camera2D
@@ -1164,6 +1214,7 @@ static const char *csharp_properties_renames[][2] = {
 	{ "FocusNeighbourLeft", "FocusNeighborLeft" }, // Control
 	{ "FocusNeighbourRight", "FocusNeighborRight" }, // Control
 	{ "FocusNeighbourTop", "FocusNeighborTop" }, // Control
+	{ "FollowViewportEnable", "FollowViewportEnabled" }, // CanvasItem
 	{ "GlobalRateScale", "PlaybackSpeedScale" }, // AudioServer
 	{ "GravityDistanceScale", "GravityPointDistanceScale" }, // Area2D
 	{ "GravityVec", "GravityDirection" }, // Area2D
@@ -1176,6 +1227,7 @@ static const char *csharp_properties_renames[][2] = {
 	{ "MarginRight", "OffsetRight" }, // Control broke NinePatchRect, StyleBox
 	{ "MarginTop", "OffsetTop" }, // Control broke NinePatchRect, StyleBox
 	{ "MidHeight", "Height" }, // CapsuleMesh
+	{ "NeighborDist", "NeighborDistance" }, // NavigationAgent2D, NavigationAgent3D
 	{ "OffsetH", "DragHorizontalOffset" }, // Camera2D
 	{ "OffsetV", "DragVerticalOffset" }, // Camera2D
 	{ "Ofs", "Offset" }, // Theme
@@ -1184,11 +1236,15 @@ static const char *csharp_properties_renames[][2] = {
 	{ "PauseMode", "ProcessMode" }, // Node
 	{ "PhysicalScancode", "PhysicalKeycode" }, // InputEventKey
 	{ "PopupExclusive", "Exclusive" }, // Window
+	{ "ProximityFadeEnable", "ProximityFadeEnabled" }, // Material
 	{ "RefuseNewNetworkConnections", "RefuseNewConnections" }, // MultiplayerAPI
 	{ "RegionFilterClip", "RegionFilterClipEnabled" }, // Sprite2D
+	{ "ReverbBusEnable", "ReverbBusEnabled" }, // Area3D
 	{ "Selectedframe", "SelectedFrame" }, // Theme
 	{ "SizeOverrideStretch", "Size2dOverrideStretch" }, // SubViewport
 	{ "SlipsOnSlope", "SlideOnSlope" }, // SeparationRayShape2D
+	{ "SmoothingEnabled", "FollowSmoothingEnabled" }, // Camera2D
+	{ "SmoothingSpeed", "FollowSmoothingSpeed" }, // Camera2D
 	{ "SsReflectionsDepthTolerance", "SsrDepthTolerance" }, // Environment
 	{ "SsReflectionsEnabled", "SsrEnabled" }, // Environment
 	{ "SsReflectionsFadeIn", "SsrFadeIn" }, // Environment
@@ -1200,6 +1256,7 @@ static const char *csharp_properties_renames[][2] = {
 	{ "TableHseparation", "TableHSeparation" }, // Theme
 	{ "TableVseparation", "TableVSeparation" }, // Theme
 	{ "Translation", "Position" }, // Node3D - broke GLTFNode
+	{ "UnitDb", "VolumeDb" }, // AudioStreamPlayer3D
 	{ "UnitOffset", "ProgressRatio" }, // PathFollow2D, PathFollow3D
 	{ "Vseparation", "VSeparation" }, // Theme
 
@@ -1713,6 +1770,7 @@ public:
 	RegEx reg_json_to = RegEx("\\bto_json\\b");
 	RegEx reg_json_parse = RegEx("([\t ]{0,})([^\n]+)parse_json\\(([^\n]+)");
 	RegEx reg_json_non_new = RegEx("([\t ]{0,})([^\n]+)JSON\\.parse\\(([^\n]+)");
+	RegEx reg_json_print = RegEx("\\bJSON\\b\\.print\\(");
 	RegEx reg_export = RegEx("export\\(([a-zA-Z0-9_]+)\\)[ ]+var[ ]+([a-zA-Z0-9_]+)");
 	RegEx reg_export_advanced = RegEx("export\\(([^)^\n]+)\\)[ ]+var[ ]+([a-zA-Z0-9_]+)([^\n]+)");
 	RegEx reg_setget_setget = RegEx("var[ ]+([a-zA-Z0-9_]+)([^\n]+)setget[ \t]+([a-zA-Z0-9_]+)[ \t]*,[ \t]*([a-zA-Z0-9_]+)");
@@ -2229,22 +2287,23 @@ Vector<String> ProjectConverter3To4::check_for_files() {
 	Vector<String> directories_to_check = Vector<String>();
 	directories_to_check.push_back("res://");
 
-	core_bind::Directory dir = core_bind::Directory();
 	while (!directories_to_check.is_empty()) {
 		String path = directories_to_check.get(directories_to_check.size() - 1); // Is there any pop_back function?
-		directories_to_check.resize(directories_to_check.size() - 1); // Remove last element.
-		if (dir.open(path) == OK) {
-			dir.set_include_hidden(true);
-			dir.list_dir_begin();
-			String current_dir = dir.get_current_dir();
-			String file_name = dir.get_next();
+		directories_to_check.resize(directories_to_check.size() - 1); // Remove last element
+
+		Ref<DirAccess> dir = DirAccess::open(path);
+		if (dir.is_valid()) {
+			dir->set_include_hidden(true);
+			dir->list_dir_begin();
+			String current_dir = dir->get_current_dir();
+			String file_name = dir->_get_next();
 
 			while (file_name != "") {
 				if (file_name == ".git" || file_name == ".import" || file_name == ".godot") {
-					file_name = dir.get_next();
+					file_name = dir->_get_next();
 					continue;
 				}
-				if (dir.current_is_dir()) {
+				if (dir->current_is_dir()) {
 					directories_to_check.append(current_dir.path_join(file_name) + "/");
 				} else {
 					bool proper_extension = false;
@@ -2255,7 +2314,7 @@ Vector<String> ProjectConverter3To4::check_for_files() {
 						collected_files.append(current_dir.path_join(file_name));
 					}
 				}
-				file_name = dir.get_next();
+				file_name = dir->_get_next();
 			}
 		} else {
 			print_verbose("Failed to open " + path);
@@ -2331,12 +2390,13 @@ bool ProjectConverter3To4::test_conversion(RegExContainer &reg_container) {
 	valid = valid && test_conversion_with_regex("[Master]", "The master and mastersync rpc behavior is not officially supported anymore. Try using another keyword or making custom logic using Multiplayer.GetRemoteSenderId()\n[RPC]", &ProjectConverter3To4::rename_csharp_attributes, "custom rename csharp", reg_container);
 	valid = valid && test_conversion_with_regex("[MasterSync]", "The master and mastersync rpc behavior is not officially supported anymore. Try using another keyword or making custom logic using Multiplayer.GetRemoteSenderId()\n[RPC(CallLocal = true)]", &ProjectConverter3To4::rename_csharp_attributes, "custom rename csharp", reg_container);
 
-	valid = valid && test_conversion_gdscript_builtin("OS.window_fullscreen = Settings.fullscreen", "ProjectSettings.set(\"display/window/size/fullscreen\", Settings.fullscreen)", &ProjectConverter3To4::rename_gdscript_functions, "custom rename", reg_container, false);
-	valid = valid && test_conversion_gdscript_builtin("OS.window_fullscreen = Settings.fullscreen", "ProjectSettings.set(\\\"display/window/size/fullscreen\\\", Settings.fullscreen)", &ProjectConverter3To4::rename_gdscript_functions, "custom rename", reg_container, true);
+	valid = valid && test_conversion_gdscript_builtin("OS.window_fullscreen = Settings.fullscreen", "if Settings.fullscreen:\n\tDisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)\nelse:\n\tDisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)", &ProjectConverter3To4::rename_gdscript_functions, "custom rename", reg_container, false);
 	valid = valid && test_conversion_gdscript_builtin("OS.get_window_safe_area()", "DisplayServer.get_display_safe_area()", &ProjectConverter3To4::rename_gdscript_functions, "custom rename", reg_container, false);
 
 	valid = valid && test_conversion_gdscript_builtin("\tvar aa = roman(r.move_and_slide( a, b, c, d, e, f )) # Roman", "\tr.set_velocity(a)\n\tr.set_up_direction(b)\n\tr.set_floor_stop_on_slope_enabled(c)\n\tr.set_max_slides(d)\n\tr.set_floor_max_angle(e)\n\t# TODOConverter40 infinite_inertia were removed in Godot 4.0 - previous value `f`\n\tr.move_and_slide()\n\tvar aa = roman(r.velocity) # Roman", &ProjectConverter3To4::rename_gdscript_functions, "custom rename", reg_container, false);
+	valid = valid && test_conversion_gdscript_builtin("\tmove_and_slide( a, b, c, d, e, f ) # Roman", "\tset_velocity(a)\n\tset_up_direction(b)\n\tset_floor_stop_on_slope_enabled(c)\n\tset_max_slides(d)\n\tset_floor_max_angle(e)\n\t# TODOConverter40 infinite_inertia were removed in Godot 4.0 - previous value `f`\n\tmove_and_slide() # Roman", &ProjectConverter3To4::rename_gdscript_functions, "custom rename", reg_container, false);
 	valid = valid && test_conversion_gdscript_builtin("\tvar aa = roman(r.move_and_slide_with_snap( a, g, b, c, d, e, f )) # Roman", "\tr.set_velocity(a)\n\t# TODOConverter40 looks that snap in Godot 4.0 is float, not vector like in Godot 3 - previous value `g`\n\tr.set_up_direction(b)\n\tr.set_floor_stop_on_slope_enabled(c)\n\tr.set_max_slides(d)\n\tr.set_floor_max_angle(e)\n\t# TODOConverter40 infinite_inertia were removed in Godot 4.0 - previous value `f`\n\tr.move_and_slide()\n\tvar aa = roman(r.velocity) # Roman", &ProjectConverter3To4::rename_gdscript_functions, "custom rename", reg_container, false);
+	valid = valid && test_conversion_gdscript_builtin("\tmove_and_slide_with_snap( a, g, b, c, d, e, f ) # Roman", "\tset_velocity(a)\n\t# TODOConverter40 looks that snap in Godot 4.0 is float, not vector like in Godot 3 - previous value `g`\n\tset_up_direction(b)\n\tset_floor_stop_on_slope_enabled(c)\n\tset_max_slides(d)\n\tset_floor_max_angle(e)\n\t# TODOConverter40 infinite_inertia were removed in Godot 4.0 - previous value `f`\n\tmove_and_slide() # Roman", &ProjectConverter3To4::rename_gdscript_functions, "custom rename", reg_container, false);
 
 	valid = valid && test_conversion_gdscript_builtin("list_dir_begin( a , b )", "list_dir_begin() # TODOGODOT4 fill missing arguments https://github.com/godotengine/godot/pull/40547", &ProjectConverter3To4::rename_gdscript_functions, "custom rename", reg_container, false);
 	valid = valid && test_conversion_gdscript_builtin("list_dir_begin( a )", "list_dir_begin() # TODOGODOT4 fill missing arguments https://github.com/godotengine/godot/pull/40547", &ProjectConverter3To4::rename_gdscript_functions, "custom rename", reg_container, false);
@@ -3043,7 +3103,7 @@ void ProjectConverter3To4::process_gdscript_line(String &line, const RegExContai
 
 	// -- \t.func() -> \tsuper.func()       Object
 	if (line.contains("(") && line.contains(".")) {
-		line = reg_container.reg_super.sub(line, "$1super.$2", true); // TODO, not sure if possible, but for now this broke String text e.g. "Choosen .gitignore" -> "Choosen super.gitignore"
+		line = reg_container.reg_super.sub(line, "$1super.$2", true); // TODO, not sure if possible, but for now this broke String text e.g. "Chosen .gitignore" -> "Chosen super.gitignore"
 	}
 
 	// -- JSON.parse(a) -> JSON.new().parse(a) etc.    JSON
@@ -3058,6 +3118,10 @@ void ProjectConverter3To4::process_gdscript_line(String &line, const RegExContai
 	// -- parse_json(a) -> JSON.get_data() etc.    Object
 	if (line.contains("parse_json")) {
 		line = reg_container.reg_json_parse.sub(line, "$1var test_json_conv = JSON.new()\n$1test_json_conv.parse($3\n$1$2test_json_conv.get_data()", true);
+	}
+	// -- JSON.print( -> JSON.stringify(
+	if (line.contains("JSON.print(")) {
+		line = reg_container.reg_json_print.sub(line, "JSON.stringify(", true);
 	}
 
 	// -- get_node(@ -> get_node(       Node
@@ -3090,13 +3154,9 @@ void ProjectConverter3To4::process_gdscript_line(String &line, const RegExContai
 		line = reg_container.reg_setget_get.sub(line, "var $1$2:\n\tget:\n\t\treturn $1 # TODOConverter40 Copy here content of $3 \n\tset(mod_value):\n\t\tmod_value  # TODOConverter40  Non existent set function", true);
 	}
 
-	// OS.window_fullscreen = true -> ProjectSettings.set("display/window/size/fullscreen",true)
+	// OS.window_fullscreen = a -> if a: DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN) else: DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
 	if (line.contains("window_fullscreen")) {
-		if (builtin) {
-			line = reg_container.reg_os_fullscreen.sub(line, "ProjectSettings.set(\\\"display/window/size/fullscreen\\\", $1)", true);
-		} else {
-			line = reg_container.reg_os_fullscreen.sub(line, "ProjectSettings.set(\"display/window/size/fullscreen\", $1)", true);
-		}
+		line = reg_container.reg_os_fullscreen.sub(line, "if $1:\n\tDisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)\nelse:\n\tDisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)", true);
 	}
 
 	// Instantiate
@@ -3144,8 +3204,13 @@ void ProjectConverter3To4::process_gdscript_line(String &line, const RegExContai
 					line_new += starting_space + "# TODOConverter40 infinite_inertia were removed in Godot 4.0 - previous value `" + parts[5] + "`\n";
 				}
 
-				line_new += starting_space + base_obj + "move_and_slide()\n";
-				line = line_new + line.substr(0, start) + "velocity" + line.substr(end + start);
+				line_new += starting_space + base_obj + "move_and_slide()";
+
+				if (!line.begins_with(starting_space + "move_and_slide")) {
+					line = line_new + "\n" + line.substr(0, start) + "velocity" + line.substr(end + start);
+				} else {
+					line = line_new + line.substr(end + start);
+				}
 			}
 		}
 	}
@@ -3195,8 +3260,13 @@ void ProjectConverter3To4::process_gdscript_line(String &line, const RegExContai
 					line_new += starting_space + "# TODOConverter40 infinite_inertia were removed in Godot 4.0 - previous value `" + parts[6] + "`\n";
 				}
 
-				line_new += starting_space + base_obj + "move_and_slide()\n";
-				line = line_new + line.substr(0, start) + "velocity" + line.substr(end + start); // move_and_slide used to return velocity
+				line_new += starting_space + base_obj + "move_and_slide()";
+
+				if (!line.begins_with(starting_space + "move_and_slide_with_snap")) {
+					line = line_new + "\n" + line.substr(0, start) + "velocity" + line.substr(end + start);
+				} else {
+					line = line_new + line.substr(end + start);
+				}
 			}
 		}
 	}
@@ -3490,6 +3560,20 @@ void ProjectConverter3To4::process_gdscript_line(String &line, const RegExContai
 			}
 		}
 	}
+
+	//  set_rotating(true)  ->   set_ignore_rotation(false)
+	if (line.contains("set_rotating(")) {
+		int start = line.find("set_rotating(");
+		int end = get_end_parenthesis(line.substr(start)) + 1;
+		if (end > -1) {
+			Vector<String> parts = parse_arguments(line.substr(start, end));
+			if (parts.size() == 1) {
+				String opposite = parts[0] == "true" ? "false" : "true";
+				line = line.substr(0, start) + "set_ignore_rotation(" + opposite + ")";
+			}
+		}
+	}
+
 	//  OS.get_window_safe_area()  ->   DisplayServer.get_display_safe_area()
 	if (line.contains("OS.get_window_safe_area(")) {
 		int start = line.find("OS.get_window_safe_area(");
@@ -3537,6 +3621,29 @@ void ProjectConverter3To4::process_gdscript_line(String &line, const RegExContai
 		}
 	}
 
+	// rotating = true  ->   ignore_rotation = false # reversed "rotating" for Camera2D
+	if (line.contains("rotating")) {
+		int start = line.find("rotating");
+		bool foundNextEqual = false;
+		String line_to_check = line.substr(start + String("rotating").length());
+		String assigned_value;
+		for (int current_index = 0; line_to_check.length() > current_index; current_index++) {
+			char32_t chr = line_to_check.get(current_index);
+			if (chr == '\t' || chr == ' ') {
+				continue;
+			} else if (chr == '=') {
+				foundNextEqual = true;
+				assigned_value = line.right(current_index).strip_edges();
+				assigned_value = assigned_value == "true" ? "false" : "true";
+			} else {
+				break;
+			}
+		}
+		if (foundNextEqual) {
+			line = line.substr(0, start) + "ignore_rotation =" + assigned_value + " # reversed \"rotating\" for Camera2D";
+		}
+	}
+
 	// OS -> Time functions
 	if (line.contains("OS.get_ticks_msec")) {
 		line = line.replace("OS.get_ticks_msec", "Time.get_ticks_msec");
@@ -3546,6 +3653,9 @@ void ProjectConverter3To4::process_gdscript_line(String &line, const RegExContai
 	}
 	if (line.contains("OS.get_unix_time")) {
 		line = line.replace("OS.get_unix_time", "Time.get_unix_time_from_system");
+	}
+	if (line.contains("OS.get_datetime")) {
+		line = line.replace("OS.get_datetime", "Time.get_datetime_dict_from_system");
 	}
 }
 
@@ -3949,6 +4059,8 @@ String ProjectConverter3To4::collect_string_from_vector(Vector<String> &vector) 
 }
 
 #else // No RegEx.
+
+ProjectConverter3To4::ProjectConverter3To4(int _p_maximum_file_size_kb, int _p_maximum_line_length) {}
 
 int ProjectConverter3To4::convert() {
 	ERR_FAIL_V_MSG(ERROR_CODE, "Can't run converter for Godot 3.x projects, because RegEx module is disabled.");

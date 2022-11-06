@@ -197,7 +197,7 @@ bool GodotCollisionSolver2D::solve_concave(const GodotShape2D *p_shape_A, const 
 		real_t axis_scale = 1.0 / axis.length();
 		axis *= axis_scale;
 
-		real_t smin, smax;
+		real_t smin = 0.0, smax = 0.0;
 		p_shape_A->project_rangev(axis, rel_transform, smin, smax);
 		smin *= axis_scale;
 		smax *= axis_scale;
@@ -229,6 +229,7 @@ bool GodotCollisionSolver2D::solve(const GodotShape2D *p_shape_A, const Transfor
 
 	if (type_A == PhysicsServer2D::SHAPE_WORLD_BOUNDARY) {
 		if (type_B == PhysicsServer2D::SHAPE_WORLD_BOUNDARY) {
+			WARN_PRINT_ONCE("Collisions between world boundaries are not supported.");
 			return false;
 		}
 
@@ -240,6 +241,7 @@ bool GodotCollisionSolver2D::solve(const GodotShape2D *p_shape_A, const Transfor
 
 	} else if (type_A == PhysicsServer2D::SHAPE_SEPARATION_RAY) {
 		if (type_B == PhysicsServer2D::SHAPE_SEPARATION_RAY) {
+			WARN_PRINT_ONCE("Collisions between two rays are not supported.");
 			return false; //no ray-ray
 		}
 
@@ -251,6 +253,7 @@ bool GodotCollisionSolver2D::solve(const GodotShape2D *p_shape_A, const Transfor
 
 	} else if (concave_B) {
 		if (concave_A) {
+			WARN_PRINT_ONCE("Collisions between two concave shapes are not supported.");
 			return false;
 		}
 

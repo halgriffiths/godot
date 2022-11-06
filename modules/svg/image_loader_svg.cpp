@@ -135,14 +135,14 @@ void ImageLoaderSVG::create_image_from_string(Ref<Image> p_image, String p_strin
 	res = sw_canvas->clear(true);
 	memfree(buffer);
 
-	p_image->create(width, height, false, Image::FORMAT_RGBA8, image);
+	p_image->set_data(width, height, false, Image::FORMAT_RGBA8, image);
 }
 
 void ImageLoaderSVG::get_recognized_extensions(List<String> *p_extensions) const {
 	p_extensions->push_back("svg");
 }
 
-Error ImageLoaderSVG::load_image(Ref<Image> p_image, Ref<FileAccess> p_fileaccess, uint32_t p_flags, float p_scale) {
+Error ImageLoaderSVG::load_image(Ref<Image> p_image, Ref<FileAccess> p_fileaccess, BitField<ImageFormatLoader::LoaderFlags> p_flags, float p_scale) {
 	String svg = p_fileaccess->get_as_utf8_string();
 
 	if (p_flags & FLAG_CONVERT_COLORS) {

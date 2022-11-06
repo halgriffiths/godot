@@ -342,7 +342,7 @@ public:
 	void set_advance_expression_base_node(const NodePath &p_advance_expression_base_node);
 	NodePath get_advance_expression_base_node() const;
 
-	TypedArray<String> get_configuration_warnings() const override;
+	PackedStringArray get_configuration_warnings() const override;
 
 	bool is_state_invalid() const;
 	String get_invalid_state_reason() const;
@@ -353,7 +353,7 @@ public:
 	Transform3D get_root_motion_transform() const;
 
 	real_t get_connection_activity(const StringName &p_path, int p_connection) const;
-	void advance(real_t p_time);
+	void advance(double p_time);
 
 	void rename_parameter(const String &p_base, const String &p_new_base);
 

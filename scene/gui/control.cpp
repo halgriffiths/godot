@@ -213,8 +213,8 @@ void Control::get_argument_options(const StringName &p_function, int p_idx, List
 	}
 }
 
-TypedArray<String> Control::get_configuration_warnings() const {
-	TypedArray<String> warnings = Node::get_configuration_warnings();
+PackedStringArray Control::get_configuration_warnings() const {
+	PackedStringArray warnings = Node::get_configuration_warnings();
 
 	if (data.mouse_filter == MOUSE_FILTER_IGNORE && !data.tooltip.is_empty()) {
 		warnings.push_back(RTR("The Hint Tooltip won't be displayed as the control's Mouse Filter is set to \"Ignore\". To solve this, set the Mouse Filter to \"Stop\" or \"Pass\"."));
@@ -633,7 +633,7 @@ Rect2 Control::get_parent_anchorable_rect() const {
 #ifdef TOOLS_ENABLED
 		Node *edited_root = get_tree()->get_edited_scene_root();
 		if (edited_root && (this == edited_root || edited_root->is_ancestor_of(this))) {
-			parent_rect.size = Size2(ProjectSettings::get_singleton()->get("display/window/size/viewport_width"), ProjectSettings::get_singleton()->get("display/window/size/viewport_height"));
+			parent_rect.size = Size2(GLOBAL_GET("display/window/size/viewport_width"), GLOBAL_GET("display/window/size/viewport_height"));
 		} else {
 			parent_rect = get_viewport()->get_visible_rect();
 		}
@@ -1436,13 +1436,6 @@ Rect2 Control::get_screen_rect() const {
 	return r;
 }
 
-Rect2 Control::get_window_rect() const {
-	ERR_FAIL_COND_V(!is_inside_tree(), Rect2());
-	Rect2 gr = get_global_rect();
-	gr.position += get_viewport()->get_visible_rect().position;
-	return gr;
-}
-
 Rect2 Control::get_anchorable_rect() const {
 	return Rect2(Point2(), get_size());
 }
@@ -1558,13 +1551,11 @@ bool Control::is_minimum_size_adjust_blocked() const {
 
 Size2 Control::get_minimum_size() const {
 	Vector2 ms;
-	if (GDVIRTUAL_CALL(_get_minimum_size, ms)) {
-		return ms;
-	}
-	return Vector2();
+	GDVIRTUAL_CALL(_get_minimum_size, ms);
+	return ms;
 }
 
-void Control::set_custom_minimum_size(const Size2i &p_custom) {
+void Control::set_custom_minimum_size(const Size2 &p_custom) {
 	if (p_custom == data.custom_minimum_size) {
 		return;
 	}
@@ -1572,7 +1563,7 @@ void Control::set_custom_minimum_size(const Size2i &p_custom) {
 	update_minimum_size();
 }
 
-Size2i Control::get_custom_minimum_size() const {
+Size2 Control::get_custom_minimum_size() const {
 	return data.custom_minimum_size;
 }
 
@@ -1759,6 +1750,34 @@ void Control::warp_mouse(const Point2 &p_position) {
 	get_viewport()->warp_mouse(get_global_transform_with_canvas().xform(p_position));
 }
 
+void Control::set_shortcut_context(const Node *p_node) {
+	if (p_node != nullptr) {
+		data.shortcut_context = p_node->get_instance_id();
+	} else {
+		data.shortcut_context = ObjectID();
+	}
+}
+
+Node *Control::get_shortcut_context() const {
+	Object *ctx_obj = ObjectDB::get_instance(data.shortcut_context);
+	Node *ctx_node = Object::cast_to<Node>(ctx_obj);
+
+	return ctx_node;
+}
+
+bool Control::is_focus_owner_in_shortcut_context() const {
+	if (data.shortcut_context == ObjectID()) {
+		// No context, therefore global - always "in" context.
+		return true;
+	}
+
+	const Node *ctx_node = get_shortcut_context();
+	const Control *vp_focus = get_viewport() ? get_viewport()->gui_get_focus_owner() : nullptr;
+
+	// If the context is valid and the viewport focus is valid, check if the context is the focus or is a parent of it.
+	return ctx_node && vp_focus && (ctx_node == vp_focus || ctx_node->is_ancestor_of(vp_focus));
+}
+
 // Drag and drop handling.
 
 void Control::set_drag_forwarding(Object *p_target) {
@@ -1778,11 +1797,8 @@ Variant Control::get_drag_data(const Point2 &p_point) {
 	}
 
 	Variant dd;
-	if (GDVIRTUAL_CALL(_get_drag_data, p_point, dd)) {
-		return dd;
-	}
-
-	return Variant();
+	GDVIRTUAL_CALL(_get_drag_data, p_point, dd);
+	return dd;
 }
 
 bool Control::can_drop_data(const Point2 &p_point, const Variant &p_data) const {
@@ -1793,11 +1809,9 @@ bool Control::can_drop_data(const Point2 &p_point, const Variant &p_data) const 
 		}
 	}
 
-	bool ret;
-	if (GDVIRTUAL_CALL(_can_drop_data, p_point, p_data, ret)) {
-		return ret;
-	}
-	return false;
+	bool ret = false;
+	GDVIRTUAL_CALL(_can_drop_data, p_point, p_data, ret);
+	return ret;
 }
 
 void Control::drop_data(const Point2 &p_point, const Variant &p_data) {
@@ -2225,7 +2239,19 @@ void Control::_window_find_focus_neighbor(const Vector2 &p_dir, Node *p_at, cons
 void Control::set_default_cursor_shape(CursorShape p_shape) {
 	ERR_FAIL_INDEX(int(p_shape), CURSOR_MAX);
 
+	if (data.default_cursor == p_shape) {
+		return;
+	}
 	data.default_cursor = p_shape;
+
+	if (!is_inside_tree()) {
+		return;
+	}
+	if (!get_global_rect().has_point(get_global_mouse_position())) {
+		return;
+	}
+
+	get_viewport()->get_base_window()->update_mouse_cursor_shape();
 }
 
 Control::CursorShape Control::get_default_cursor_shape() const {
@@ -2692,11 +2718,8 @@ void Control::end_bulk_theme_override() {
 TypedArray<Vector2i> Control::structured_text_parser(TextServer::StructuredTextParser p_parser_type, const Array &p_args, const String &p_text) const {
 	if (p_parser_type == TextServer::STRUCTURED_TEXT_CUSTOM) {
 		TypedArray<Vector2i> ret;
-		if (GDVIRTUAL_CALL(_structured_text_parser, p_args, p_text, ret)) {
-			return ret;
-		} else {
-			return TypedArray<Vector2i>();
-		}
+		GDVIRTUAL_CALL(_structured_text_parser, p_args, p_text, ret);
+		return ret;
 	} else {
 		return TS->parse_structured_text(p_parser_type, p_args, p_text);
 	}
@@ -2781,10 +2804,8 @@ String Control::get_tooltip(const Point2 &p_pos) const {
 
 Control *Control::make_custom_tooltip(const String &p_text) const {
 	Object *ret = nullptr;
-	if (GDVIRTUAL_CALL(_make_custom_tooltip, p_text, ret)) {
-		return Object::cast_to<Control>(ret);
-	}
-	return nullptr;
+	GDVIRTUAL_CALL(_make_custom_tooltip, p_text, ret);
+	return Object::cast_to<Control>(ret);
 }
 
 // Base object overrides.
@@ -2873,8 +2894,8 @@ void Control::_notification(int p_notification) {
 			if (data.parent_canvas_item) {
 				data.parent_canvas_item->disconnect("item_rect_changed", callable_mp(this, &Control::_size_changed));
 				data.parent_canvas_item = nullptr;
-			} else if (!is_set_as_top_level()) {
-				//disconnect viewport
+			} else {
+				// Disconnect viewport.
 				Viewport *viewport = get_viewport();
 				ERR_FAIL_COND(!viewport);
 				viewport->disconnect("size_changed", callable_mp(this, &Control::_size_changed));
@@ -3121,6 +3142,9 @@ void Control::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("warp_mouse", "position"), &Control::warp_mouse);
 
+	ClassDB::bind_method(D_METHOD("set_shortcut_context", "node"), &Control::set_shortcut_context);
+	ClassDB::bind_method(D_METHOD("get_shortcut_context"), &Control::get_shortcut_context);
+
 	ClassDB::bind_method(D_METHOD("update_minimum_size"), &Control::update_minimum_size);
 
 	ClassDB::bind_method(D_METHOD("set_layout_direction", "direction"), &Control::set_layout_direction);
@@ -3132,7 +3156,7 @@ void Control::_bind_methods() {
 
 	ADD_GROUP("Layout", "");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "clip_contents"), "set_clip_contents", "is_clipping_contents");
-	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2I, "custom_minimum_size", PROPERTY_HINT_NONE, "suffix:px"), "set_custom_minimum_size", "get_custom_minimum_size");
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "custom_minimum_size", PROPERTY_HINT_NONE, "suffix:px"), "set_custom_minimum_size", "get_custom_minimum_size");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "layout_direction", PROPERTY_HINT_ENUM, "Inherited,Locale,Left-to-Right,Right-to-Left"), "set_layout_direction", "get_layout_direction");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "layout_mode", PROPERTY_HINT_ENUM, "Position,Anchors,Container,Uncontrolled", PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_INTERNAL), "_set_layout_mode", "_get_layout_mode");
 	ADD_PROPERTY_DEFAULT("layout_mode", LayoutMode::LAYOUT_MODE_POSITION);
@@ -3193,6 +3217,9 @@ void Control::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "mouse_filter", PROPERTY_HINT_ENUM, "Stop,Pass,Ignore"), "set_mouse_filter", "get_mouse_filter");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "mouse_force_pass_scroll_events"), "set_force_pass_scroll_events", "is_force_pass_scroll_events");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "mouse_default_cursor_shape", PROPERTY_HINT_ENUM, "Arrow,I-Beam,Pointing Hand,Cross,Wait,Busy,Drag,Can Drop,Forbidden,Vertical Resize,Horizontal Resize,Secondary Diagonal Resize,Main Diagonal Resize,Move,Vertical Split,Horizontal Split,Help"), "set_default_cursor_shape", "get_default_cursor_shape");
+
+	ADD_GROUP("Input", "");
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "shortcut_context", PROPERTY_HINT_NODE_TYPE, "Node"), "set_shortcut_context", "get_shortcut_context");
 
 	ADD_GROUP("Theme", "theme_");
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "theme", PROPERTY_HINT_RESOURCE_TYPE, "Theme"), "set_theme", "get_theme");

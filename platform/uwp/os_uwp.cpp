@@ -159,7 +159,7 @@ Error OS_UWP::initialize(const VideoMode &p_desired, int p_video_driver, int p_a
 	outside = true;
 
 	// FIXME: Hardcoded for now, add Vulkan support.
-	p_video_driver = VIDEO_DRIVER_OPENGL;
+	p_video_driver = RENDERING_DRIVER_OPENGL3;
 	ContextEGL_UWP::Driver opengl_api_type = ContextEGL_UWP::GLES_2_0;
 
 	bool gl_initialization_error = false;
@@ -442,6 +442,16 @@ void OS_UWP::get_fullscreen_mode_list(List<VideoMode> *p_list, int p_screen) con
 
 String OS_UWP::get_name() const {
 	return "UWP";
+}
+
+String OS_UWP::get_distribution_name() const {
+	return get_name();
+}
+
+String OS_UWP::get_version() const {
+	winrt::hstring df_version = VersionInfo().DeviceFamilyVersion();
+	static String version = String(winrt::to_string(df_version).c_str());
+	return version;
 }
 
 OS::DateTime OS_UWP::get_datetime(bool p_utc) const {
@@ -816,10 +826,6 @@ OS_UWP::OS_UWP() {
 	pressrc = 0;
 	old_invalid = true;
 	mouse_mode = MOUSE_MODE_VISIBLE;
-#ifdef STDOUT_FILE
-	stdo = fopen("stdout.txt", "wb");
-#endif
-
 	gl_context = nullptr;
 
 	display_request = ref new Windows::System::Display::DisplayRequest();
@@ -837,7 +843,4 @@ OS_UWP::OS_UWP() {
 }
 
 OS_UWP::~OS_UWP() {
-#ifdef STDOUT_FILE
-	fclose(stdo);
-#endif
 }
