@@ -1,5 +1,5 @@
 /*************************************************************************/
-/*  gltf_document_extension.h                                            */
+/*  thorvg_bounds_iterator.cpp                                           */
 /*************************************************************************/
 /*                       This file is part of:                           */
 /*                           GODOT ENGINE                                */
@@ -28,35 +28,43 @@
 /* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                */
 /*************************************************************************/
 
-#ifndef GLTF_DOCUMENT_EXTENSION_H
-#define GLTF_DOCUMENT_EXTENSION_H
+#ifdef GDEXTENSION
+// Headers for building as GDExtension plug-in.
 
-#include "gltf_state.h"
-#include "structures/gltf_node.h"
+#include <godot_cpp/godot.hpp>
 
-class GLTFDocumentExtension : public Resource {
-	GDCLASS(GLTFDocumentExtension, Resource);
+using namespace godot;
 
-protected:
-	static void _bind_methods();
+#else
+// Headers for building as built-in module.
 
-public:
-	virtual Vector<String> get_supported_extensions();
-	virtual Error import_preflight(Ref<GLTFState> p_state);
-	virtual Error import_post_parse(Ref<GLTFState> p_state);
-	virtual Error export_post(Ref<GLTFState> p_state);
-	virtual Error import_post(Ref<GLTFState> p_state, Node *p_node);
-	virtual Error export_preflight(Node *p_state);
-	virtual Error import_node(Ref<GLTFState> p_state, Ref<GLTFNode> p_gltf_node, Dictionary &r_json, Node *p_node);
-	virtual Error export_node(Ref<GLTFState> p_state, Ref<GLTFNode> p_gltf_node, Dictionary &r_json, Node *p_node);
-	GDVIRTUAL0R(Vector<String>, _get_supported_extensions);
-	GDVIRTUAL1R(int, _import_preflight, Ref<GLTFState>);
-	GDVIRTUAL1R(int, _import_post_parse, Ref<GLTFState>);
-	GDVIRTUAL4R(int, _import_node, Ref<GLTFState>, Ref<GLTFNode>, Dictionary, Node *);
-	GDVIRTUAL2R(int, _import_post, Ref<GLTFState>, Node *);
-	GDVIRTUAL1R(int, _export_preflight, Node *);
-	GDVIRTUAL4R(int, _export_node, Ref<GLTFState>, Ref<GLTFNode>, Dictionary, Node *);
-	GDVIRTUAL1R(int, _export_post, Ref<GLTFState>);
-};
+#include "core/typedefs.h"
 
-#endif // GLTF_DOCUMENT_EXTENSION_H
+#include "modules/modules_enabled.gen.h" // For svg.
+#endif
+
+#ifdef MODULE_SVG_ENABLED
+
+#include "thorvg_bounds_iterator.h"
+
+#include <tvgIteratorAccessor.h>
+#include <tvgPaint.h>
+
+// This function uses private ThorVG API to get bounding box of top level children elements.
+
+void tvg_get_bounds(tvg::Picture *p_picture, float &r_min_x, float &r_min_y, float &r_max_x, float &r_max_y) {
+	tvg::IteratorAccessor itrAccessor;
+	if (tvg::Iterator *it = itrAccessor.iterator(p_picture)) {
+		while (const tvg::Paint *child = it->next()) {
+			float x = 0, y = 0, w = 0, h = 0;
+			child->bounds(&x, &y, &w, &h, true);
+			r_min_x = MIN(x, r_min_x);
+			r_min_y = MIN(y, r_min_y);
+			r_max_x = MAX(x + w, r_max_x);
+			r_max_y = MAX(y + h, r_max_y);
+		}
+		delete (it);
+	}
+}
+
+#endif // MODULE_SVG_ENABLED

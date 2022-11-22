@@ -1,5 +1,5 @@
 /*************************************************************************/
-/*  replication_editor_plugin.h                                          */
+/*  replication_editor.h                                                 */
 /*************************************************************************/
 /*                       This file is part of:                           */
 /*                           GODOT ENGINE                                */
@@ -28,21 +28,21 @@
 /* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                */
 /*************************************************************************/
 
-#ifndef REPLICATION_EDITOR_PLUGIN_H
-#define REPLICATION_EDITOR_PLUGIN_H
+#ifndef REPLICATION_EDITOR_H
+#define REPLICATION_EDITOR_H
 
 #include "editor/editor_plugin.h"
-
-#include "editor/editor_spin_slider.h"
-#include "editor/property_selector.h"
-
-#include "../scene_replication_config.h"
+#include "modules/multiplayer/scene_replication_config.h"
+#include "scene/gui/box_container.h"
 
 class ConfirmationDialog;
 class MultiplayerSynchronizer;
-class SceneTreeDialog;
+class AcceptDialog;
+class LineEdit;
 class Tree;
 class TreeItem;
+class PropertySelector;
+class SceneTreeDialog;
 
 class ReplicationEditor : public VBoxContainer {
 	GDCLASS(ReplicationEditor, VBoxContainer);
@@ -105,27 +105,4 @@ public:
 	~ReplicationEditor() {}
 };
 
-class ReplicationEditorPlugin : public EditorPlugin {
-	GDCLASS(ReplicationEditorPlugin, EditorPlugin);
-
-private:
-	Button *button = nullptr;
-	ReplicationEditor *repl_editor = nullptr;
-
-	void _node_removed(Node *p_node);
-
-	void _pinned();
-
-protected:
-	void _notification(int p_what);
-
-public:
-	virtual void edit(Object *p_object) override;
-	virtual bool handles(Object *p_object) const override;
-	virtual void make_visible(bool p_visible) override;
-
-	ReplicationEditorPlugin();
-	~ReplicationEditorPlugin();
-};
-
-#endif // REPLICATION_EDITOR_PLUGIN_H
+#endif // REPLICATION_EDITOR_H
